@@ -1,0 +1,57 @@
+/* 1. Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* 2. Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. Your tokens */
+@import './styles/tokens.css';
+
+/* 4. Base resets using tokens */
+@layer base {
+  body {
+    background-color: var(--color-bg-base);
+    color:            var(--color-text-primary);
+    font-family:      var(--font-body);
+    font-size:        var(--text-sm);
+    line-height:      var(--leading-normal);
+  }
+
+  /* ── Scrollbars ──────────────────────────────────────────────────────
+     Themed via design tokens so they flip cleanly between dark + light.
+     Firefox: scrollbar-color (thumb track). WebKit: detailed pseudos. */
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-default) transparent;
+  }
+
+  /* WebKit / Blink (Chrome, Edge, Safari) */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-default);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-border-strong);
+  }
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Optional: hide scrollbar in horizontal mini-elements (tabs, chips, etc.)
+     by adding class="no-scrollbar" */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+}
