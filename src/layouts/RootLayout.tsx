@@ -10,7 +10,6 @@ import { NAV_ITEMS, ROUTES } from "@/constants/routes";
 import {
   LuLogOut,
   LuUser,
-  LuChevronDown,
   LuChevronLeft,
   LuChevronRight,
   LuSettings,

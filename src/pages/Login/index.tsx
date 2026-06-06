@@ -47,7 +47,6 @@ export default function Login() {
   const [showPw, setShowPw]     = useState(false);
   const [remember, setRemember] = useState(false);
   const [loading, setLoading]   = useState(false);
-  const [pwTouched, setPwTouched] = useState(false);
 
   const pwRules = useMemo(() => checkPassword(password), [password]);
   const pwValid = isPasswordValid(pwRules);
@@ -55,7 +54,6 @@ export default function Login() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setPwTouched(true);
 
     if (!email || !password) {
       toast.error("Email and password are required.");
@@ -142,11 +140,7 @@ export default function Login() {
                 <input
                   type={showPw ? "text" : "password"}
                   value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setPwTouched(true);
-                  }}
-                  onBlur={() => setPwTouched(true)}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
                   autoComplete="current-password"
                   maxLength={128}

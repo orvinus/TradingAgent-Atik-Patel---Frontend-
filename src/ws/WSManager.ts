@@ -32,6 +32,16 @@ export class WSManager {
     this.subscriptions.get(topic)!.add(cb);
     return () => this.unsubscribe(topic, cb);
   }
+
+  private unsubscribe(topic: string, cb: (msg: any) => void) {
+    const cbs = this.subscriptions.get(topic);
+    if (!cbs) return;
+    cbs.delete(cb);
+    if (cbs.size === 0) {
+      this.subscriptions.delete(topic);
+      this.send({ op: "unsubscribe", topic });
+    }
+  }
  
   private dispatch(data: any) {
     const cbs = this.subscriptions.get(data.topic);

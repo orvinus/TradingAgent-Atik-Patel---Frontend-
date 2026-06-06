@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useWS } from "@/ws/WSProvider";
  
 export function useWebSocket<T = any>(topic: string | null) {

@@ -2,7 +2,7 @@
 import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/Lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { WSProvider } from "@/ws/WSProvider";
 import { router } from "@/router/index";
 import { ToastViewport } from "@/components/ui/Toast";
