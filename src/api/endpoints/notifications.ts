@@ -5,9 +5,15 @@ import type {
   ConnectionsListResponse,
   DisconnectResponse,
   DiscordConnectLinkResponse,
+  DispatchBroadcastBody,
+  DispatchResponse,
+  DispatchUserBody,
+  InboxItem,
+  InboxListResponse,
   NotificationConnection,
   NotificationProvider,
   TelegramConnectLinkResponse,
+  UnreadCountResponse,
 } from "@/types/notifications";
 
 export const notificationsApi = {
@@ -45,9 +51,63 @@ export const notificationsApi = {
     );
     return data.data;
   },
+
+  // ── Inbox ──────────────────────────────────────────────────────────────
+
+  getUnreadCount: async (): Promise<number> => {
+    const { data } = await apiClient.get<ApiEnvelope<UnreadCountResponse>>(
+      "/notifications/inbox/unread-count"
+    );
+    return data.data.count;
+  },
+
+  getInbox: async (params: {
+    limit?: number;
+    offset?: number;
+    unreadOnly?: boolean;
+  }): Promise<{ items: InboxItem[]; hasMore: boolean }> => {
+    const { data } = await apiClient.get<ApiEnvelope<InboxListResponse | InboxItem[]>>(
+      "/notifications/inbox",
+      { params }
+    );
+    const limit = params.limit ?? 20;
+    const raw = data.data;
+    const items: InboxItem[] = Array.isArray(raw) ? raw : (raw.items ?? []);
+    const hasMore = items.length === limit;
+    return { items, hasMore };
+  },
+
+  markAsRead: async (notificationId: string): Promise<void> => {
+    await apiClient.post(`/notifications/inbox/${notificationId}/read`);
+  },
+
+  // ── Admin dispatch ─────────────────────────────────────────────────────
+
+  adminDispatchToUser: async (body: DispatchUserBody): Promise<DispatchResponse> => {
+    const { data } = await apiClient.post<ApiEnvelope<DispatchResponse>>(
+      "/notifications/dispatch/user",
+      body,
+      { headers: dispatchHeaders() }
+    );
+    return data.data;
+  },
+
+  adminDispatchBroadcast: async (body: DispatchBroadcastBody): Promise<DispatchResponse> => {
+    const { data } = await apiClient.post<ApiEnvelope<DispatchResponse>>(
+      "/notifications/dispatch/broadcast",
+      body,
+      { headers: dispatchHeaders() }
+    );
+    return data.data;
+  },
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────
+
+function dispatchHeaders(): Record<string, string> {
+  const key = import.meta.env.VITE_NOTIFICATIONS_DISPATCH_API_KEY as string | undefined;
+  return key ? { "X-Notifications-Api-Key": key } : {};
+}
 
 function normalizeConnectionList(
   payload: ConnectionsListResponse

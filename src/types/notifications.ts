@@ -1,6 +1,9 @@
 // src/types/notifications.ts
 
 export type NotificationProvider = "telegram" | "discord";
+export type NotificationKind = "general" | "alert" | "trade" | "system";
+export type NotificationChannel = "platform" | "telegram" | "discord";
+export type DeliveryStatus = "sent" | "failed" | "skipped" | "pending";
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -48,4 +51,65 @@ export type ConnectionsListResponse =
 export interface DisconnectResponse {
   provider: NotificationProvider;
   disconnected: boolean;
+}
+
+// ── Inbox ──────────────────────────────────────────────────────────────────
+
+export interface InboxDelivery {
+  channel: NotificationChannel;
+  status: DeliveryStatus;
+  stats: Record<string, unknown>;
+  deliveredAt: string | null;
+}
+
+export interface InboxItem {
+  id: string;
+  title: string | null;
+  body: string;
+  audienceType: "individual" | "broadcast";
+  targetUserId: string | null;
+  kind: NotificationKind;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  readAt: string | null;
+  isRead: boolean;
+  deliveries: InboxDelivery[];
+}
+
+export interface InboxListResponse {
+  items: InboxItem[];
+  total?: number;
+  hasMore?: boolean;
+}
+
+export interface UnreadCountResponse {
+  count: number;
+}
+
+// ── Dispatch ───────────────────────────────────────────────────────────────
+
+export interface DispatchUserBody {
+  userId: string;
+  title?: string;
+  text: string;
+  kind?: NotificationKind;
+  channels?: NotificationChannel[];
+}
+
+export interface DispatchBroadcastBody {
+  title?: string;
+  text: string;
+  kind?: NotificationKind;
+  channels?: NotificationChannel[];
+}
+
+export interface DispatchDeliveryResult {
+  status: DeliveryStatus;
+  lastError?: string;
+}
+
+export interface DispatchResponse {
+  notificationId: string;
+  deliveries: Partial<Record<NotificationChannel, DispatchDeliveryResult>>;
 }

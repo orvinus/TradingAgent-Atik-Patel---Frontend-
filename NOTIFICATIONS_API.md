@@ -1,126 +1,209 @@
-# Notification Connections API (Telegram + Discord)
+# Notifications API (Connections, Inbox, Dispatch)
 
-This document covers the production notification connection module for TRADING-OS using the shared `notification_connections` table and provider-based services.
+Complete API reference for TRADING-OS notifications: **Telegram/Discord connections**, **platform inbox**, and **dispatch** (send to users or broadcast).
 
----
+**Base path:** `/api/v1`
 
-## Architecture overview
-
-| Layer | Responsibility |
-|--------|----------------|
-| **REST** | `/api/v1/notifications/*` for user connect/disconnect/list and internal dispatch APIs. |
-| **Webhook** | `/api/v1/webhooks/telegram` receives Telegram Update payloads. |
-| **OAuth callback** | `/api/v1/auth/discord/callback` handles Discord code exchange and user mapping. |
-| **Services** | `notificationConnection.*` for provider-independent upsert/disconnect rules; provider-specific telegram/discord services for integration logic. |
-| **Persistence** | PostgreSQL `notification_connections` + Sequelize `NotificationConnection` model. |
+**Postman collection:** `docs/postman/TRADING-OS_Telegram_Discord_Connections.postman_collection.json`
 
 ---
 
-## Database
+## Quick reference
 
-- **Migration files**
-  - `db/migrations/003_notification_connections.sql`
-  - `db/migrations/004_notification_connections_provider_chat_nullable.sql`
-- **Table:** `notification_connections`
-- **Enum:** `notification_provider_type` with `telegram`, `discord`
+| Group | Auth | Base path |
+|-------|------|-----------|
+| Connections (Telegram/Discord link) | Bearer JWT | `/notifications/*` |
+| Platform inbox (read notifications) | Bearer JWT | `/notifications/inbox*` |
+| Dispatch (send alerts) | `X-Notifications-Api-Key` | `/notifications/dispatch/*`, `/notifications/telegram/dispatch/*`, `/notifications/discord/dispatch/*` |
+| Telegram webhook | `X-Telegram-Bot-Api-Secret-Token` (optional) | `/webhooks/telegram` |
+| Discord OAuth callback | Signed `state` query param | `/auth/discord/callback` |
 
-### Constraints and indexes
-
-- **UNIQUE** `(user_id, provider_type)`  
-  One row per provider per platform user (reconnect updates existing row).
-- **Partial UNIQUE** `(provider_type, provider_user_id)` where `is_connected=true`  
-  Prevents same external account from being actively connected to multiple platform users.
-- **Indexes** on `user_id`, `(provider_type, is_connected)` for fast reads and dispatch scans.
-
----
-
-## Environment variables
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `TELEGRAM_BOT_TOKEN` | Telegram | Bot token from BotFather. |
-| `TELEGRAM_BOT_USERNAME` | Telegram | Bot username (without `@`) for deep links. |
-| `TELEGRAM_WEBHOOK_SECRET` | Telegram | Secret for `X-Telegram-Bot-Api-Secret-Token` verification. |
-| `PUBLIC_API_BASE_URL` | Telegram | Base URL used by server startup to call Telegram `setWebhook`. |
-| `DISCORD_CLIENT_ID` | Discord OAuth | Discord OAuth2 application client id. |
-| `DISCORD_CLIENT_SECRET` | Discord OAuth | Discord OAuth2 application secret. |
-| `DISCORD_REDIRECT_URI` | Discord OAuth | Callback URL, must exactly match Discord Developer Portal redirect entry. |
-| `DISCORD_BOT_TOKEN` | Discord bot | Token used for bot login and messaging. |
-| `DISCORD_GUILD_ID` | Optional | Guild validation/metadata check. |
-| `DISCORD_ALERT_CHANNEL_ID` | Optional | Channel used by trade-alert dispatch endpoint. |
-| `NOTIFICATIONS_DISPATCH_API_KEY` | Optional | Required header for internal dispatch APIs (`X-Notifications-Api-Key`). |
-
----
-
-## Connection flow (Telegram)
-
-1. User signs in and frontend calls **GET** `/api/v1/notifications/telegram/connect-link`.
-2. API returns `https://t.me/<BOT_USERNAME>?start=user_<platform_user_uuid>`.
-3. User opens bot and presses **START**.
-4. Telegram sends update to **POST** `/api/v1/webhooks/telegram`.
-5. Backend verifies webhook secret header (when configured).
-6. Backend parses `/start` payload, resolves platform user, upserts provider connection.
-7. Bot replies with success/failure message.
-
-### Telegram webhook endpoint details
-
-**POST** `/api/v1/webhooks/telegram`
-
-- **Auth:** None (Telegram server-to-server request)
-- **Header (when secret configured):**
-  - `X-Telegram-Bot-Api-Secret-Token: <TELEGRAM_WEBHOOK_SECRET>`
-- **Body:** Raw Telegram Update JSON.
-
-**Sample Update**
+### Default success envelope
 
 ```json
 {
-  "update_id": 10002,
-  "message": {
-    "message_id": 12,
-    "from": {
-      "id": 987654321,
-      "is_bot": false,
-      "first_name": "Ada",
-      "last_name": "Trader",
-      "username": "ada_trader",
-      "language_code": "en"
-    },
-    "chat": {
-      "id": 987654321,
-      "first_name": "Ada",
-      "username": "ada_trader",
-      "type": "private"
-    },
-    "date": 1715000000,
-    "text": "/start user_550e8400-e29b-41d4-a716-446655440000"
-  }
+  "success": true,
+  "data": {}
+}
+```
+
+### Default error envelope
+
+```json
+{
+  "success": false,
+  "message": "Human-readable message",
+  "code": "ERROR_CODE"
 }
 ```
 
 ---
 
-## Connection flow (Discord OAuth2)
+## Authentication & headers
 
-1. User signs in and frontend calls **GET** `/api/v1/notifications/discord/connect-link`.
-2. API returns Discord OAuth URL with signed state.
-3. Frontend redirects user to Discord authorization page.
-4. User approves; Discord redirects back to **GET** `/api/v1/auth/discord/callback?code=...&state=...`.
-5. Backend validates state (JWT-signed + expiry), exchanges code for access token.
-6. Backend fetches Discord user profile (`/users/@me`) and guild data (`/users/@me/guilds`).
-7. Backend upserts `provider_type='discord'` row in `notification_connections`.
-8. API returns success response.
+### Bearer JWT (user endpoints)
 
-### Discord OAuth callback endpoint details
+Used for: connect/disconnect, list connections, inbox.
 
-**GET** `/api/v1/auth/discord/callback`
+```
+Authorization: Bearer <access_token>
+Content-Type: application/json
+```
 
-- **Auth:** None (state token is the CSRF/user binding control)
-- **Query params:**
-  - `code` (required)
-  - `state` (required, signed token from connect-link API)
+Obtain token via **POST** `/api/v1/auth/login`:
 
-**Success response (example)**
+```json
+{
+  "email": "trader@example.com",
+  "password": "your-password"
+}
+```
+
+**Login response:**
+
+```json
+{
+  "success": true,
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "...",
+  "token_type": "Bearer",
+  "expires_in": 900,
+  "session_id": "...",
+  "role": "trader"
+}
+```
+
+### Dispatch API key (send endpoints)
+
+Used for: all `POST .../dispatch/*` routes.
+
+```
+X-Notifications-Api-Key: <NOTIFICATIONS_DISPATCH_API_KEY>
+Content-Type: application/json
+```
+
+| Error | HTTP | Code |
+|-------|------|------|
+| Key not configured on server | 503 | `DISPATCH_DISABLED` |
+| Missing or wrong key | 401 | `INVALID_DISPATCH_KEY` |
+
+> **Frontend note:** Do **not** embed `NOTIFICATIONS_DISPATCH_API_KEY` in the browser bundle. Admin send UI should call a **backend admin proxy** that validates JWT + admin permission and adds this header server-side. See `docs/FRONTEND_NOTIFICATIONS_PROMPT.md`.
+
+### Telegram webhook secret (optional)
+
+```
+X-Telegram-Bot-Api-Secret-Token: <TELEGRAM_WEBHOOK_SECRET>
+```
+
+---
+
+## Environment variables
+
+| Variable | Used for |
+|----------|----------|
+| `TELEGRAM_BOT_TOKEN` | Telegram bot + messaging |
+| `TELEGRAM_BOT_USERNAME` | Connect deep links |
+| `TELEGRAM_WEBHOOK_SECRET` | Webhook verification |
+| `PUBLIC_API_BASE_URL` | Auto `setWebhook` on startup |
+| `DISCORD_CLIENT_ID` | OAuth connect |
+| `DISCORD_CLIENT_SECRET` | OAuth connect |
+| `DISCORD_REDIRECT_URI` | OAuth callback (must match Discord portal) |
+| `DISCORD_BOT_TOKEN` | Discord DMs |
+| `DISCORD_GUILD_ID` | Optional guild check |
+| `DISCORD_ALERT_CHANNEL_ID` | Trade-alert channel |
+| `NOTIFICATIONS_DISPATCH_API_KEY` | Dispatch API header |
+
+---
+
+## Database
+
+| Migration | Purpose |
+|-----------|---------|
+| `003_notification_connections.sql` | Telegram/Discord connection rows |
+| `004_notification_connections_provider_chat_nullable.sql` | Nullable `provider_chat_id` for OAuth |
+| `008_notifications.sql` | `notifications`, `notification_deliveries`, `notification_reads` |
+
+### Concepts
+
+| Concept | Description |
+|---------|-------------|
+| **Individual** | Notification for one user (`target_user_id`) |
+| **Broadcast** | Visible in every user's inbox |
+| **Platform channel** | Stored in DB, shown in inbox |
+| **Telegram / Discord** | External delivery; status in `deliveries` |
+
+Every dispatch call **always persists** to the platform inbox.
+
+### Notification kinds
+
+`general` | `alert` | `trade` | `system` (default: `general`)
+
+### Delivery channels
+
+`platform` | `telegram` | `discord`
+
+### Delivery status
+
+`sent` | `failed` | `skipped` | `pending`
+
+---
+
+# Part 1 — Connection APIs (Telegram & Discord)
+
+> **Frontend:** Connection UI (connect link, disconnect, status) is **already implemented**. Do not rebuild.
+
+## 1.1 Generate Telegram connect link
+
+**GET** `/api/v1/notifications/telegram/connect-link`  
+**Auth:** Bearer JWT
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "provider": "telegram",
+    "url": "https://t.me/MyTradingOsBot?start=user_550e8400-e29b-41d4-a716-446655440000",
+    "startPayload": "user_550e8400-e29b-41d4-a716-446655440000",
+    "botUsername": "MyTradingOsBot"
+  }
+}
+```
+
+**Flow:** User opens `url` → presses START in Telegram → webhook completes link.
+
+---
+
+## 1.2 Generate Discord connect link
+
+**GET** `/api/v1/notifications/discord/connect-link`  
+**Auth:** Bearer JWT
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "provider": "discord",
+    "url": "https://discord.com/oauth2/authorize?client_id=...&response_type=code&redirect_uri=...&scope=identify+guilds&prompt=consent&state=...",
+    "state": "eyJhbGciOiJIUzI1NiIs...",
+    "scopes": ["identify", "guilds"]
+  }
+}
+```
+
+**Flow:** Redirect user to `url` → Discord redirects to callback.
+
+---
+
+## 1.3 Discord OAuth callback
+
+**GET** `/api/v1/auth/discord/callback?code=<oauth_code>&state=<state_token>`  
+**Auth:** None (CSRF via signed `state`)
+
+**Response:**
 
 ```json
 {
@@ -135,159 +218,421 @@ This document covers the production notification connection module for TRADING-O
 }
 ```
 
-**Example stored metadata shape**
+---
+
+## 1.4 List my notification connections
+
+**GET** `/api/v1/notifications/connections`  
+**Auth:** Bearer JWT
+
+**Response:**
 
 ```json
 {
-  "discord": {
-    "discord_user_id": "126382761827361",
-    "username": "ada_trader",
-    "global_name": "Ada",
-    "discriminator": "0",
-    "avatar": "f146cb87d2d0",
-    "locale": "en-US",
-    "verified": true,
-    "email": "ada@example.com",
-    "guild_id": "112233445566",
-    "in_configured_guild": true,
-    "scopes": ["identify", "guilds"],
-    "raw_discord_payload": {
-      "user": {},
-      "guilds": []
+  "success": true,
+  "data": {
+    "connections": [
+      {
+        "id": "conn-uuid-1",
+        "providerType": "telegram",
+        "isConnected": true,
+        "connectedAt": "2025-06-01T12:00:00.000Z",
+        "disconnectedAt": null,
+        "providerUsername": "ada_trader"
+      },
+      {
+        "id": "conn-uuid-2",
+        "providerType": "discord",
+        "isConnected": false,
+        "connectedAt": null,
+        "disconnectedAt": "2025-06-02T08:00:00.000Z",
+        "providerUsername": null
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 1.5 Disconnect Telegram
+
+**DELETE** `/api/v1/notifications/telegram/disconnect`  
+**Auth:** Bearer JWT
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "disconnected": true,
+    "alreadyDisconnected": false
+  }
+}
+```
+
+---
+
+## 1.6 Disconnect Discord
+
+**DELETE** `/api/v1/notifications/discord/disconnect`  
+**Auth:** Bearer JWT
+
+**Response:** Same shape as disconnect Telegram.
+
+---
+
+## 1.7 Telegram webhook (server-to-server)
+
+**POST** `/api/v1/webhooks/telegram`  
+**Auth:** None  
+**Header (if configured):** `X-Telegram-Bot-Api-Secret-Token`
+
+**Body:** Raw Telegram Update JSON.
+
+```json
+{
+  "update_id": 10002,
+  "message": {
+    "message_id": 12,
+    "from": {
+      "id": 987654321,
+      "is_bot": false,
+      "first_name": "Ada",
+      "username": "ada_trader"
+    },
+    "chat": {
+      "id": 987654321,
+      "type": "private"
+    },
+    "date": 1715000000,
+    "text": "/start user_550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
+
+---
+
+# Part 2 — Platform Inbox APIs (Frontend notifications UI)
+
+Used by: header bell dropdown, notifications page, unread badge.
+
+## 2.1 List inbox notifications
+
+**GET** `/api/v1/notifications/inbox`  
+**Auth:** Bearer JWT
+
+**Query parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `limit` | int | 20 | 1–100 |
+| `offset` | int | 0 | Pagination offset |
+| `unreadOnly` | `true` \| `false` | false | Only unread items |
+
+**Example:** `GET /api/v1/notifications/inbox?limit=20&offset=0&unreadOnly=false`
+
+Returns **individual** notifications for the logged-in user plus **all broadcast** notifications. Sorted **newest first** (`created_at DESC`).
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "unreadCount": 3,
+    "items": [
+      {
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        "title": "Trade alert",
+        "body": "BTC/USDT signal triggered.",
+        "audienceType": "individual",
+        "targetUserId": "550e8400-e29b-41d4-a716-446655440000",
+        "kind": "alert",
+        "metadata": {},
+        "createdAt": "2026-06-12T10:00:00.000Z",
+        "updatedAt": "2026-06-12T10:00:00.000Z",
+        "readAt": null,
+        "isRead": false,
+        "deliveries": [
+          {
+            "channel": "discord",
+            "status": "sent",
+            "stats": {},
+            "deliveredAt": "2026-06-12T10:00:01.000Z"
+          },
+          {
+            "channel": "platform",
+            "status": "sent",
+            "stats": { "stored": true },
+            "deliveredAt": "2026-06-12T10:00:00.000Z"
+          },
+          {
+            "channel": "telegram",
+            "status": "sent",
+            "stats": {},
+            "deliveredAt": "2026-06-12T10:00:01.000Z"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Frontend usage:**
+
+| UI | Suggested call |
+|----|----------------|
+| Header dropdown (2–3 items) | `limit=3&offset=0` |
+| Notifications page | `limit=20&offset=<page*20>` |
+| Unread filter | `unreadOnly=true` |
+
+> **Date range / kind filters:** Not yet supported as query params. Filter `kind` and `createdAt` client-side on loaded items, or add backend params in a follow-up (`kind`, `fromDate`, `toDate`).
+
+---
+
+## 2.2 Get unread count only
+
+**GET** `/api/v1/notifications/inbox/unread-count`  
+**Auth:** Bearer JWT
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "unreadCount": 3
+  }
+}
+```
+
+Use for header badge. Poll every 30–60s or refresh after mark-read / new dispatch.
+
+---
+
+## 2.3 Mark notification as read
+
+**POST** `/api/v1/notifications/inbox/:notificationId/read`  
+**Auth:** Bearer JWT
+
+**Path param:** `notificationId` — UUID
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notificationId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "readAt": "2026-06-12T10:05:00.000Z"
+  }
+}
+```
+
+**Errors:**
+
+| HTTP | Code | When |
+|------|------|------|
+| 404 | `NOTIFICATION_NOT_FOUND` | ID not visible to user |
+
+> **Mark all as read:** No bulk endpoint yet. Frontend loops `POST .../read` for each unread item (fetch with `unreadOnly=true`, paginate if needed).
+
+---
+
+# Part 3 — Unified Dispatch (Platform + Telegram + Discord)
+
+One API call fans out to selected channels. Always stores in platform inbox.
+
+**Auth:** `X-Notifications-Api-Key`
+
+## 3.1 Send to one user (all channels)
+
+**POST** `/api/v1/notifications/dispatch/user`
+
+**Headers:**
+
+```
+Content-Type: application/json
+X-Notifications-Api-Key: <NOTIFICATIONS_DISPATCH_API_KEY>
+```
+
+**Body:**
+
+```json
+{
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "title": "Trade alert",
+  "text": "BTC/USDT signal triggered at 68420.",
+  "kind": "alert",
+  "channels": ["platform", "telegram", "discord"]
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `userId` | Yes | Platform user UUID |
+| `text` | Yes | Max 4096 chars |
+| `title` | No | Inbox title (max 255) |
+| `kind` | No | `general`, `alert`, `trade`, `system` |
+| `channels` | No | Default: `["platform","telegram","discord"]` |
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "notificationId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "audienceType": "individual",
+    "targetUserId": "550e8400-e29b-41d4-a716-446655440000",
+    "kind": "alert",
+    "createdAt": "2026-06-12T10:00:00.000Z",
+    "deliveries": {
+      "platform": {
+        "channel": "platform",
+        "status": "sent",
+        "stats": { "stored": true },
+        "lastError": null,
+        "deliveredAt": "2026-06-12T10:00:00.000Z"
+      },
+      "telegram": {
+        "channel": "telegram",
+        "status": "sent",
+        "stats": { "delivered": true, "provider": "telegram", "chatId": "987654321" },
+        "lastError": null,
+        "deliveredAt": "2026-06-12T10:00:01.000Z"
+      },
+      "discord": {
+        "channel": "discord",
+        "status": "sent",
+        "stats": { "delivered": true, "provider": "discord", "discordUserId": "126382761827361" },
+        "lastError": null,
+        "deliveredAt": "2026-06-12T10:00:01.000Z"
+      }
     }
   }
 }
 ```
 
----
-
-## REST APIs
-
-Default success envelope:
-
-```json
-{
-  "success": true,
-  "data": {}
-}
-```
-
-### 1) Generate Telegram connect link
-
-**GET** `/api/v1/notifications/telegram/connect-link`  
-**Auth:** Bearer JWT
-
-**Sample response**
-
-```json
-{
-  "success": true,
-  "data": {
-    "provider": "telegram",
-    "url": "https://t.me/MyTradingOsBot?start=user_550e8400-e29b-41d4-a716-446655440000",
-    "startPayload": "user_550e8400-e29b-41d4-a716-446655440000",
-    "botUsername": "MyTradingOsBot"
-  }
-}
-```
-
-### 2) Generate Discord connect link
-
-**GET** `/api/v1/notifications/discord/connect-link`  
-**Auth:** Bearer JWT
-
-**Sample response**
-
-```json
-{
-  "success": true,
-  "data": {
-    "provider": "discord",
-    "url": "https://discord.com/oauth2/authorize?client_id=...&response_type=code&redirect_uri=...&scope=identify+guilds&prompt=consent&state=...",
-    "state": "eyJhbGciOiJIUzI1NiIs...",
-    "scopes": ["identify", "guilds"]
-  }
-}
-```
-
-### 3) Telegram webhook
-
-**POST** `/api/v1/webhooks/telegram`  
-**Auth:** None  
-**Header (if configured):**  
-`X-Telegram-Bot-Api-Secret-Token: <TELEGRAM_WEBHOOK_SECRET>`
-
-### 4) Discord OAuth callback
-
-**GET** `/api/v1/auth/discord/callback?code=<oauth_code>&state=<state_token>`
-
-### 5) Get user notification connections
-
-**GET** `/api/v1/notifications/connections`  
-**Auth:** Bearer JWT
-
-### 6) Disconnect Telegram
-
-**DELETE** `/api/v1/notifications/telegram/disconnect`  
-**Auth:** Bearer JWT
-
-### 7) Disconnect Discord
-
-**DELETE** `/api/v1/notifications/discord/disconnect`  
-**Auth:** Bearer JWT
+If Telegram/Discord not connected, that channel may be `failed` with `lastError`; platform row is still `sent`.
 
 ---
 
-## Internal dispatch APIs (alerts/news/broadcast)
+## 3.2 Broadcast to all users (all channels)
 
-All dispatch endpoints require:
+**POST** `/api/v1/notifications/dispatch/broadcast`
 
-`X-Notifications-Api-Key: <NOTIFICATIONS_DISPATCH_API_KEY>`
+**Headers:** Same as 3.1
 
-### Telegram dispatch
+**Body:**
 
-1. **POST** `/api/v1/notifications/telegram/dispatch/user`  
-   Body:
+```json
+{
+  "title": "Maintenance",
+  "text": "System maintenance tonight at 02:00 UTC.",
+  "kind": "system",
+  "channels": ["platform", "telegram", "discord"]
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `text` | Yes | Max 4096 chars |
+| `title` | No | Inbox title |
+| `kind` | No | Default `general` |
+| `channels` | No | Default all three |
+
+**Response:** Same shape as 3.1 with `audienceType: "broadcast"` and `targetUserId: null`.
+
+---
+
+# Part 4 — Provider-specific dispatch
+
+Also persists to platform inbox. Use when sending to **one channel only**.
+
+**Auth:** `X-Notifications-Api-Key`
+
+## 4.1 Telegram — send to user
+
+**POST** `/api/v1/notifications/telegram/dispatch/user`
 
 ```json
 {
   "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "text": "BTC/USDT alert fired."
+  "title": "Trade alert",
+  "text": "BTC/USDT alert fired.",
+  "kind": "alert"
 }
 ```
 
-2. **POST** `/api/v1/notifications/telegram/dispatch/broadcast`  
-   Body:
+| Field | Required | Max length |
+|-------|----------|------------|
+| `userId` | Yes | UUID |
+| `text` | Yes | 4096 |
+| `title` | No | 255 |
+| `kind` | No | enum |
+
+**Errors:** `TELEGRAM_NOT_CONNECTED` if user has no active Telegram link.
+
+---
+
+## 4.2 Telegram — broadcast
+
+**POST** `/api/v1/notifications/telegram/dispatch/broadcast`
 
 ```json
 {
-  "text": "System maintenance at 02:00 UTC."
+  "title": "Market update",
+  "text": "System maintenance at 02:00 UTC.",
+  "kind": "system"
 }
 ```
 
-### Discord dispatch
+---
 
-1. **POST** `/api/v1/notifications/discord/dispatch/user`  
-   Body:
+## 4.3 Discord — send to user
+
+**POST** `/api/v1/notifications/discord/dispatch/user`
 
 ```json
 {
   "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "text": "Your trading signal triggered."
+  "title": "Signal",
+  "text": "Your trading signal triggered.",
+  "kind": "trade"
 }
 ```
 
-2. **POST** `/api/v1/notifications/discord/dispatch/broadcast`  
-   Body:
+| Field | Required | Max length |
+|-------|----------|------------|
+| `text` | Yes | 2000 |
+
+**Errors:** `DISCORD_NOT_CONNECTED`
+
+---
+
+## 4.4 Discord — broadcast
+
+**POST** `/api/v1/notifications/discord/dispatch/broadcast`
 
 ```json
 {
-  "text": "Major market event alert."
+  "title": "Market update",
+  "text": "Major market event alert.",
+  "kind": "alert"
 }
 ```
 
-3. **POST** `/api/v1/notifications/discord/dispatch/trade-alert`  
-   Body:
+---
+
+## 4.5 Discord — trade alert to channel
+
+**POST** `/api/v1/notifications/discord/dispatch/trade-alert`
+
+Does **not** use `title`/`text`/`kind` — posts formatted alert to `DISCORD_ALERT_CHANNEL_ID`.
 
 ```json
 {
@@ -297,56 +642,78 @@ All dispatch endpoints require:
 }
 ```
 
----
-
-## Security notes
-
-- **Telegram webhook validation:** secret header checked when `TELEGRAM_WEBHOOK_SECRET` is set.
-- **Discord CSRF protection:** signed expiring OAuth state is mandatory (`INVALID_OAUTH_STATE` on mismatch/expiry).
-- **Duplicate prevention:** enforced in app transaction + DB unique constraints.
-- **Provider account ownership:** same external account cannot be actively linked to two platform users.
-- **Dispatch safety:** internal dispatch routes disabled unless `NOTIFICATIONS_DISPATCH_API_KEY` is configured.
+| Field | Required | Notes |
+|-------|----------|-------|
+| `symbol` | Yes | Max 50 chars |
+| `side` | Yes | `BUY` or `SELL` |
+| `price` | Yes | number or string |
 
 ---
 
-## Operational checklist
+# Part 5 — curl examples
 
-1. Apply DB migrations:
-   - `003_notification_connections.sql`
-   - `004_notification_connections_provider_chat_nullable.sql`
-2. Configure env values for Telegram and Discord.
-3. Ensure Discord Developer Portal redirect URL exactly equals `DISCORD_REDIRECT_URI`.
-4. Start backend and verify startup logs for Telegram webhook setup and Discord bot init (if configured).
-5. In Telegram, open the deep link from **GET** connect-link and complete **START**.
-6. Optionally set `NOTIFICATIONS_DISPATCH_API_KEY` and test single-user and broadcast sends.
+```bash
+export API_BASE="http://localhost:3000/api/v1"
+export DISPATCH_KEY="your-notifications-dispatch-api-key"
+export USER_ID="550e8400-e29b-41d4-a716-446655440000"
+export ACCESS_TOKEN="your-jwt-access-token"
+```
+
+**Inbox:**
+
+```bash
+curl -s "$API_BASE/notifications/inbox?limit=3" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq
+
+curl -s "$API_BASE/notifications/inbox/unread-count" \
+  -H "Authorization: Bearer $ACCESS_TOKEN" | jq
+```
+
+**Unified dispatch:**
+
+```bash
+curl -s -X POST "$API_BASE/notifications/dispatch/user" \
+  -H "Content-Type: application/json" \
+  -H "X-Notifications-Api-Key: $DISPATCH_KEY" \
+  -d "{
+    \"userId\": \"$USER_ID\",
+    \"title\": \"Personal alert\",
+    \"text\": \"Your BTC limit order filled.\",
+    \"kind\": \"trade\"
+  }" | jq
+```
+
+**Telegram-only:**
+
+```bash
+curl -s -X POST "$API_BASE/notifications/telegram/dispatch/broadcast" \
+  -H "Content-Type: application/json" \
+  -H "X-Notifications-Api-Key: $DISPATCH_KEY" \
+  -d '{"title":"Update","text":"Telegram broadcast test.","kind":"general"}' | jq
+```
 
 ---
 
-## Future enhancements
+# Security notes
 
-- Add richer provider capabilities in `provider_metadata` versioned schema.
-- Move high-volume broadcast to queue/job workers.
-- Add Discord role-based channel routing for strategy-specific signals.
-- Add provider health checks and retry policy for outbound dispatch.
+- **Dispatch key** must stay server-side for production admin UI.
+- **Telegram webhook:** secret header when `TELEGRAM_WEBHOOK_SECRET` is set.
+- **Discord OAuth:** signed expiring `state` required.
+- **Duplicate external accounts:** same Telegram/Discord account cannot be actively linked to two platform users.
+- **Dispatch disabled** when `NOTIFICATIONS_DISPATCH_API_KEY` is unset (503).
 
 ---
 
-## Code map
+# Code map
 
 | Path | Role |
 |------|------|
-| `db/migrations/003_notification_connections.sql` | Base schema for provider connections |
-| `db/migrations/004_notification_connections_provider_chat_nullable.sql` | Makes `provider_chat_id` nullable for OAuth providers |
-| `src/models/NotificationConnection.js` | Sequelize model |
-| `src/db/sequelize.js` | Sequelize instance (search_path follows `DATABASE_SCHEMA`) |
-| `src/services/notifications/*` | Provider-agnostic connection + dispatch orchestrator |
-| `src/services/telegram/*` | Deep link generation + Telegraf setup + webhook registration |
-| `src/services/discord/*` | OAuth connect/callback + discord.js bot messaging |
-| `src/modules/notifications/*` | Connect/disconnect/list + internal dispatch HTTP layer |
-| `src/modules/auth/auth.routes.js` | Discord OAuth callback route (`/api/v1/auth/discord/callback`) |
-| `src/modules/webhooks/*` | Telegram webhook HTTP layer |
-| `src/middleware/telegramWebhookVerify.js` | Telegram webhook secret verification |
-| `src/middleware/requireNotificationsDispatchKey.js` | Internal dispatch API key guard |
-| `src/utils/telegramStartPayload.js` | Parse/build Telegram `/start` payload |
-| `src/utils/discordOauthState.js` | Signed Discord OAuth state generation and validation |
-
+| `db/migrations/003_notification_connections.sql` | Connection schema |
+| `db/migrations/008_notifications.sql` | Notification store schema |
+| `src/modules/notifications/notifications.routes.js` | All HTTP routes |
+| `src/modules/notifications/notifications.controller.js` | Request handlers |
+| `src/services/notifications/notificationStore.service.js` | Inbox + persist |
+| `src/services/notifications/notificationDispatch.service.js` | Send + persist |
+| `src/middleware/requireNotificationsDispatchKey.js` | Dispatch key guard |
+| `docs/postman/TRADING-OS_Telegram_Discord_Connections.postman_collection.json` | Postman collection |
+| `docs/FRONTEND_NOTIFICATIONS_PROMPT.md` | Frontend implementation prompt |

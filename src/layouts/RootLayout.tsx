@@ -13,11 +13,11 @@ import {
   LuChevronLeft,
   LuChevronRight,
   LuSettings,
-  LuBell,
   LuSearch,
 } from "react-icons/lu";
 import { authApi } from "@/api/endpoints/auth";
 import { useHasAnyPermission } from "@/hooks/usePermissions";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 // ── User Menu ─────────────────────────────────────────────────────────────
 function UserMenu() {
   const { user, logout } = useAppStore();
@@ -143,8 +143,7 @@ function UserMenu() {
 }
 
 export default function RootLayout() {
-  const { theme, sidebarCollapsed, setSidebarCollapsed, unreadCount } =
-    useAppStore();
+  const { theme, sidebarCollapsed, setSidebarCollapsed } = useAppStore();
   const themeMode = useThemeStore((s) => s.theme);
 
   // Theme-aware logo with /logo-light.png → /logo.png fallback. If we
@@ -181,9 +180,16 @@ export default function RootLayout() {
     "rbac.roles.read",
     "rbac.permissions.read",
   ]);
-  const visibleNav = NAV_ITEMS.filter(
-    (item) => item.to !== ROUTES.ADMIN || canSeeAdmin
-  );
+  const canSeeAdminAlerts = useHasAnyPermission([
+    "notifications.dispatch.write",
+    "rbac.roles.read",
+  ]);
+  const visibleNav = NAV_ITEMS.filter((item) => {
+    if ("hidden" in item && item.hidden) return false;
+    if (item.to === ROUTES.ADMIN && !canSeeAdmin) return false;
+    if ("adminOnly" in item && item.adminOnly && !canSeeAdminAlerts) return false;
+    return true;
+  });
 
   // Resolve the current page's title, icon, and subtitle from NAV_ITEMS.
   // For parametrised routes (e.g. /options/:symbol), match by path prefix.
@@ -331,14 +337,7 @@ export default function RootLayout() {
               </span>
               Live
             </span>
-            <button className="relative p-1.5 rounded-sm hover:bg-bg-elevated transition-colors">
-              <LuBell className="w-4 h-4 text-text-secondary" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-bear text-white text-[.55rem] font-mono flex items-center justify-center">
-                  {unreadCount > 9 ? "9+" : unreadCount}
-                </span>
-              )}
-            </button>
+            <NotificationBell />
             <UserMenu />
           </div>
         </header>

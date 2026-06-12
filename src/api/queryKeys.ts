@@ -189,6 +189,11 @@ export const qk = {
   binanceBars:       (cid: string, symbol: string, days: number) =>
                                              ["binance", cid, "bars", symbol, days] as const,
 
+  // ── Notifications ──────────────────────────────────────────────────────
+  notificationsUnreadCount: ()                           => ["notifications", "unread-count"]     as const,
+  notificationsInbox:       (offset: number, unreadOnly: boolean) =>
+                                                            ["notifications", "inbox", offset, unreadOnly] as const,
+
   // ── Other ──────────────────────────────────────────────────────────────
   riskProfile:      (scope: string)       => ["risk", scope]               as const,
   news:             (filter?: string)     => ["news", filter]              as const,
