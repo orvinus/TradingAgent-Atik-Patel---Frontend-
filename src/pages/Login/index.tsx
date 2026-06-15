@@ -1,5 +1,5 @@
 // src/pages/Login/index.tsx
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useAppStore } from "@/store/index";
@@ -9,32 +9,6 @@ import { BrandMark } from "@/components/auth/BrandMark";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "@/components/ui/Toast";
 import { LuMail, LuLock, LuEye, LuEyeOff, LuLoader } from "react-icons/lu";
-
-// ─── Password validation ────────────────────────────────────────────────────
-
-interface PasswordRules {
-  minLength: boolean;   // ≥ 12
-  maxLength: boolean;   // ≤ 128
-  uppercase: boolean;   // at least one A-Z
-  lowercase: boolean;   // at least one a-z
-  digit: boolean;       // at least one 0-9
-  symbol: boolean;      // at least one special char
-}
-
-function checkPassword(pw: string): PasswordRules {
-  return {
-    minLength: pw.length >= 12,
-    maxLength: pw.length <= 128,
-    uppercase: /[A-Z]/.test(pw),
-    lowercase: /[a-z]/.test(pw),
-    digit: /[0-9]/.test(pw),
-    symbol: /[^A-Za-z0-9]/.test(pw),
-  };
-}
-
-function isPasswordValid(rules: PasswordRules): boolean {
-  return Object.values(rules).every(Boolean);
-}
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
@@ -48,20 +22,11 @@ export default function Login() {
   const [remember, setRemember] = useState(false);
   const [loading, setLoading]   = useState(false);
 
-  const pwRules = useMemo(() => checkPassword(password), [password]);
-  const pwValid = isPasswordValid(pwRules);
-
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
     if (!email || !password) {
       toast.error("Email and password are required.");
-      return;
-    }
-
-    if (!pwValid) {
-      toast.error("Please fix the password issues below before signing in.");
       return;
     }
 
