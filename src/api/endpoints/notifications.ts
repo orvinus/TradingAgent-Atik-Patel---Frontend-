@@ -58,7 +58,7 @@ export const notificationsApi = {
     const { data } = await apiClient.get<ApiEnvelope<UnreadCountResponse>>(
       "/notifications/inbox/unread-count"
     );
-    return data.data.count;
+    return data.data.unreadCount;
   },
 
   getInbox: async (params: {

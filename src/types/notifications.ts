@@ -84,7 +84,7 @@ export interface InboxListResponse {
 }
 
 export interface UnreadCountResponse {
-  count: number;
+  unreadCount: number;
 }
 
 // ── Dispatch ───────────────────────────────────────────────────────────────
