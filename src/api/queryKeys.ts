@@ -189,6 +189,12 @@ export const qk = {
   binanceBars:       (cid: string, symbol: string, days: number) =>
                                              ["binance", cid, "bars", symbol, days] as const,
 
+  // ── Copy Trading (Telegram) ────────────────────────────────────────────
+  copyTradingConfig:        ()                           => ["copy-trading", "config"]             as const,
+  copyTradingStatus:        ()                           => ["copy-trading", "status"]             as const,
+  copyTradingSources:       ()                           => ["copy-trading", "sources"]            as const,
+  copyTradingDialogs:       ()                           => ["copy-trading", "dialogs"]            as const,
+
   // ── Notifications ──────────────────────────────────────────────────────
   notificationsUnreadCount: ()                           => ["notifications", "unread-count"]     as const,
   notificationsInbox:       (offset: number, unreadOnly: boolean) =>

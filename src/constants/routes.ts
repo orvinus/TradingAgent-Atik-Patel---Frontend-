@@ -15,9 +15,11 @@ export const ROUTES = {
   DISCOVER:       "/discover",
   BRIEFING:       "/briefing",
   LLM:            "/llm",
-  NOTIFICATIONS:  "/notifications",
-  SEND_ALERTS:    "/admin/send-alerts",
-  LOGIN:          "/login",
+  NOTIFICATIONS:         "/notifications",
+  SEND_ALERTS:           "/admin/send-alerts",
+  COPY_TRADING:          "/copy-trading/connections",
+  COPY_TRADING_TELEGRAM: "/copy-trading/connections/telegram",
+  LOGIN:                 "/login",
 } as const;
 
 // Nav items for sidebar — order matches page map from spec.
@@ -37,6 +39,7 @@ export const NAV_ITEMS = [
   { to: ROUTES.DISCOVER,     label: "Discovery",     icon: "⊹", subtitle: "Find new opportunities across markets" },
   { to: ROUTES.BRIEFING,     label: "Briefing",      icon: "☀", subtitle: "Daily market briefing and outlook" },
   { to: ROUTES.LLM,          label: "LLM Config",    icon: "⊛", subtitle: "Tune the AI models powering the platform" },
+  { to: ROUTES.COPY_TRADING,  label: "Copy Trading",  icon: "⊕", subtitle: "Connect signal sources to copy trades" },
   { to: ROUTES.AUDIT,        label: "Audit Trail",   icon: "≡", subtitle: "Every action, signed and timestamped" },
   { to: ROUTES.ADMIN,         label: "Admin",         icon: "⚙", subtitle: "Users, roles, and platform configuration" },
   { to: ROUTES.SEND_ALERTS,   label: "Send Alerts",   icon: "⊟", subtitle: "Dispatch notifications via Telegram, Discord, or platform", adminOnly: true },
