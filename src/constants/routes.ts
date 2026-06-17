@@ -17,9 +17,11 @@ export const ROUTES = {
   LLM:            "/llm",
   NOTIFICATIONS:         "/notifications",
   SEND_ALERTS:           "/admin/send-alerts",
-  COPY_TRADING:          "/copy-trading/connections",
-  COPY_TRADING_TELEGRAM: "/copy-trading/connections/telegram",
-  LOGIN:                 "/login",
+  COPY_TRADING:                 "/copy-trading/connections",
+  COPY_TRADING_TELEGRAM:        "/copy-trading/connections/telegram",
+  COPY_TRADING_DISCORD:         "/copy-trading/connections/discord",
+  COPY_TRADING_DISCORD_RETURN:  "/copy-trading/discord",
+  LOGIN:                        "/login",
 } as const;
 
 // Nav items for sidebar — order matches page map from spec.

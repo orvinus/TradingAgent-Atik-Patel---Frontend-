@@ -195,6 +195,13 @@ export const qk = {
   copyTradingSources:       ()                           => ["copy-trading", "sources"]            as const,
   copyTradingDialogs:       ()                           => ["copy-trading", "dialogs"]            as const,
 
+  // ── Copy Trading (Discord) ─────────────────────────────────────────────
+  discordConfig:            ()                           => ["discord-copy", "config"]             as const,
+  discordStatus:            ()                           => ["discord-copy", "status"]             as const,
+  discordGuilds:            ()                           => ["discord-copy", "guilds"]             as const,
+  discordChannels:          (guildId: string)            => ["discord-copy", "channels", guildId]  as const,
+  discordSources:           ()                           => ["discord-copy", "sources"]            as const,
+
   // ── Notifications ──────────────────────────────────────────────────────
   notificationsUnreadCount: ()                           => ["notifications", "unread-count"]     as const,
   notificationsInbox:       (offset: number, unreadOnly: boolean) =>
