@@ -6,16 +6,20 @@ import axios from "axios";
 import {
   LuArrowLeft,
   LuLoader,
-  LuWifiOff,
   LuExternalLink,
   LuServer,
   LuHash,
   LuRefreshCw,
+  LuInfo,
 } from "react-icons/lu";
 import { discordCopierApi } from "@/api/endpoints/discordCopyTrading";
 import { qk } from "@/api/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { toast } from "@/components/ui/Toast";
+import {
+  DiscordBotAccessGuide,
+  type GuideFocus,
+} from "@/components/discord/DiscordBotAccessGuide";
 
 // ── Error helpers ─────────────────────────────────────────────────────────────
 
@@ -80,6 +84,13 @@ export default function CopyTradingDiscord() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [selectedGuildId, setSelectedGuildId] = useState<string | null>(null);
   const [confirmStop, setConfirmStop] = useState<string | null>(null);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [guideFocus, setGuideFocus] = useState<GuideFocus>("both");
+
+  function openGuide(focus: GuideFocus = "both") {
+    setGuideFocus(focus);
+    setGuideOpen(true);
+  }
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -141,7 +152,12 @@ export default function CopyTradingDiscord() {
       const name = source.channelName ? `#${source.channelName}` : "Channel";
       toast.success(`${name} is now being copied`);
     },
-    onError: (err) => toast.error(apiErr(err)),
+    onError: (err) => {
+      const c = errCode(err);
+      if (c === "DISCORD_BOT_NOT_IN_GUILD") openGuide("part1");
+      else if (c === "DISCORD_CHANNEL_NO_ACCESS") openGuide("part2");
+      toast.error(apiErr(err));
+    },
   });
 
   const removeSource = useMutation({
@@ -325,11 +341,28 @@ export default function CopyTradingDiscord() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {guideOpen && (
+        <DiscordBotAccessGuide
+          focus={guideFocus}
+          selectedGuildId={selectedGuildId}
+          onClose={() => setGuideOpen(false)}
+        />
+      )}
+
       <Back onClick={() => navigate(ROUTES.COPY_TRADING)} />
 
-      <h1 className="font-display text-xl font-bold uppercase tracking-[.12em] text-text-primary">
-        Discord Copy Trading
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-display text-xl font-bold uppercase tracking-[.12em] text-text-primary">
+          Discord Copy Trading
+        </h1>
+        <button
+          onClick={() => openGuide("both")}
+          className="flex items-center gap-1.5 font-mono text-[.62rem] text-text-muted transition-colors hover:text-accent"
+        >
+          <LuInfo className="h-3.5 w-3.5" />
+          Can't see your channel?
+        </button>
+      </div>
 
       {/* Connection status header */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border-subtle bg-bg-surface p-4 shadow-card">
@@ -441,12 +474,20 @@ export default function CopyTradingDiscord() {
                     </span>
                   )}
                   {!guild.botPresent && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleInviteBot(); }}
-                      className="ml-3 flex-shrink-0 font-mono text-[.6rem] text-accent underline hover:no-underline"
-                    >
-                      Invite bot
-                    </button>
+                    <div className="ml-3 flex flex-shrink-0 items-center gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleInviteBot(); }}
+                        className="font-mono text-[.6rem] text-accent underline hover:no-underline"
+                      >
+                        Invite bot
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openGuide("part1"); }}
+                        className="font-mono text-[.6rem] text-text-muted underline hover:no-underline"
+                      >
+                        Setup guide
+                      </button>
+                    </div>
                   )}
                 </div>
               );
@@ -508,7 +549,15 @@ export default function CopyTradingDiscord() {
                       </div>
                     </div>
 
-                    <div className="ml-4 flex-shrink-0">
+                    <div className="ml-4 flex flex-shrink-0 items-center gap-2">
+                      {!channel.botCanRead && !alreadyCopied && (
+                        <button
+                          onClick={() => openGuide("part2")}
+                          className="font-mono text-[.6rem] text-text-muted underline hover:no-underline"
+                        >
+                          Setup guide
+                        </button>
+                      )}
                       {alreadyCopied ? (
                         <span className="font-mono text-[.62rem] text-bull">Copying</span>
                       ) : (

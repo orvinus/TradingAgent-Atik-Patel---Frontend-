@@ -201,6 +201,7 @@ export const qk = {
   discordGuilds:            ()                           => ["discord-copy", "guilds"]             as const,
   discordChannels:          (guildId: string)            => ["discord-copy", "channels", guildId]  as const,
   discordSources:           ()                           => ["discord-copy", "sources"]            as const,
+  discordInvite:            ()                           => ["discord-copy", "invite"]             as const,
 
   // ── Notifications ──────────────────────────────────────────────────────
   notificationsUnreadCount: ()                           => ["notifications", "unread-count"]     as const,
