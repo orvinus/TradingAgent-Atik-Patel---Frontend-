@@ -205,8 +205,9 @@ export const qk = {
 
   // ── Notifications ──────────────────────────────────────────────────────
   notificationsUnreadCount: ()                           => ["notifications", "unread-count"]     as const,
-  notificationsInbox:       (offset: number, unreadOnly: boolean) =>
-                                                            ["notifications", "inbox", offset, unreadOnly] as const,
+  notificationsInbox:       (offset: number, unreadOnly: boolean, limit: number) =>
+                                                            ["notifications", "inbox", offset, unreadOnly, limit] as const,
+  notificationsInboxPreview: ()                           => ["notifications", "inbox", "preview"] as const,
 
   // ── Other ──────────────────────────────────────────────────────────────
   riskProfile:      (scope: string)       => ["risk", scope]               as const,

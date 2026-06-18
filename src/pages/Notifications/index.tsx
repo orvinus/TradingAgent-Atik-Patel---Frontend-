@@ -1,9 +1,7 @@
 import { useState } from "react";
 import { LuLoader, LuBell, LuCheck, LuChevronLeft, LuChevronRight } from "react-icons/lu";
-import { useNotificationInbox, useMarkAsRead, useMarkAllRead } from "@/features/notifications/hooks/useNotificationInbox";
+import { useNotificationInbox, useMarkAsRead, useMarkAllRead, NOTIFICATIONS_PAGE_SIZE } from "@/features/notifications/hooks/useNotificationInbox";
 import type { InboxItem, NotificationKind, DeliveryStatus, NotificationChannel } from "@/types/notifications";
-
-const PAGE_SIZE = 20;
 
 const KIND_LABELS: Record<NotificationKind, string> = {
   general: "General",
@@ -119,7 +117,7 @@ export default function Notifications() {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [kindFilter, setKindFilter] = useState<NotificationKind | "">("");
 
-  const offset = page * PAGE_SIZE;
+  const offset = page * NOTIFICATIONS_PAGE_SIZE;
   const { data, isLoading, isFetching, error, refetch } = useNotificationInbox(offset, unreadOnly);
   const markRead = useMarkAsRead();
   const markAll = useMarkAllRead();

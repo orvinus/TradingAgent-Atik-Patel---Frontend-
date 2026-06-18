@@ -3,21 +3,22 @@ import { notificationsApi } from "@/api/endpoints/notifications";
 import { useAppStore } from "@/store/index";
 import { qk } from "@/api/queryKeys";
 
-const PAGE_SIZE = 20;
+export const NOTIFICATIONS_PAGE_SIZE = 10;
+const PREVIEW_SIZE = 3;
 
 export function useNotificationInbox(offset: number, unreadOnly: boolean) {
   return useQuery({
-    queryKey: qk.notificationsInbox(offset, unreadOnly),
+    queryKey: qk.notificationsInbox(offset, unreadOnly, NOTIFICATIONS_PAGE_SIZE),
     queryFn: () =>
-      notificationsApi.getInbox({ limit: PAGE_SIZE, offset, unreadOnly }),
+      notificationsApi.getInbox({ limit: NOTIFICATIONS_PAGE_SIZE, offset, unreadOnly }),
     placeholderData: (prev) => prev,
   });
 }
 
 export function useNotificationPreview() {
   return useQuery({
-    queryKey: qk.notificationsInbox(0, false),
-    queryFn: () => notificationsApi.getInbox({ limit: 3, offset: 0 }),
+    queryKey: qk.notificationsInboxPreview(),
+    queryFn: () => notificationsApi.getInbox({ limit: PREVIEW_SIZE, offset: 0 }),
   });
 }
 
