@@ -189,6 +189,26 @@ export const qk = {
   binanceBars:       (cid: string, symbol: string, days: number) =>
                                              ["binance", cid, "bars", symbol, days] as const,
 
+  // ── Copy Trading (Telegram) ────────────────────────────────────────────
+  copyTradingConfig:        ()                           => ["copy-trading", "config"]             as const,
+  copyTradingStatus:        ()                           => ["copy-trading", "status"]             as const,
+  copyTradingSources:       ()                           => ["copy-trading", "sources"]            as const,
+  copyTradingDialogs:       ()                           => ["copy-trading", "dialogs"]            as const,
+
+  // ── Copy Trading (Discord) ─────────────────────────────────────────────
+  discordConfig:            ()                           => ["discord-copy", "config"]             as const,
+  discordStatus:            ()                           => ["discord-copy", "status"]             as const,
+  discordGuilds:            ()                           => ["discord-copy", "guilds"]             as const,
+  discordChannels:          (guildId: string)            => ["discord-copy", "channels", guildId]  as const,
+  discordSources:           ()                           => ["discord-copy", "sources"]            as const,
+  discordInvite:            ()                           => ["discord-copy", "invite"]             as const,
+
+  // ── Notifications ──────────────────────────────────────────────────────
+  notificationsUnreadCount: ()                           => ["notifications", "unread-count"]     as const,
+  notificationsInbox:       (offset: number, unreadOnly: boolean, limit: number) =>
+                                                            ["notifications", "inbox", offset, unreadOnly, limit] as const,
+  notificationsInboxPreview: ()                           => ["notifications", "inbox", "preview"] as const,
+
   // ── Other ──────────────────────────────────────────────────────────────
   riskProfile:      (scope: string)       => ["risk", scope]               as const,
   news:             (filter?: string)     => ["news", filter]              as const,

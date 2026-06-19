@@ -20,6 +20,12 @@ const Options         = lazy(() => import("@/pages/Options/index"));
 const Discover        = lazy(() => import("@/pages/Discover/index"));
 const Briefing        = lazy(() => import("@/pages/Briefing/index"));
 const LLM             = lazy(() => import("@/pages/LLM/index"));
+const Notifications         = lazy(() => import("@/pages/Notifications/index"));
+const AdminSendAlerts       = lazy(() => import("@/pages/AdminSendAlerts/index"));
+const CopyTrading                 = lazy(() => import("@/pages/CopyTrading/index"));
+const CopyTradingTelegram         = lazy(() => import("@/pages/CopyTradingTelegram/index"));
+const CopyTradingDiscord          = lazy(() => import("@/pages/CopyTradingDiscord/index"));
+const CopyTradingDiscordReturn    = lazy(() => import("@/pages/CopyTradingDiscordReturn/index"));
 
 const Login           = lazy(() => import("@/pages/Login/index"));
 const Signup          = lazy(() => import("@/pages/Signup/index"));
@@ -139,8 +145,14 @@ export const router = createBrowserRouter([
       { path: "/audit",           element: <Page component={Audit}        /> },
       { path: "/options/:symbol", element: <Page component={Options}      /> },
       { path: "/discover",        element: <Page component={Discover}     /> },
-      { path: "/briefing",        element: <Page component={Briefing}     /> },
-      { path: "/llm",             element: <Page component={LLM}          /> },
+      { path: "/briefing",          element: <Page component={Briefing}       /> },
+      { path: "/llm",               element: <Page component={LLM}            /> },
+      { path: "/notifications",                    element: <Page component={Notifications}        /> },
+      { path: "/admin/send-alerts",                element: <Page component={AdminSendAlerts}      /> },
+      { path: "/copy-trading/connections",          element: <Page component={CopyTrading}               /> },
+      { path: "/copy-trading/connections/telegram", element: <Page component={CopyTradingTelegram}       /> },
+      { path: "/copy-trading/connections/discord",  element: <Page component={CopyTradingDiscord}        /> },
+      { path: "/copy-trading/discord",              element: <Page component={CopyTradingDiscordReturn}  /> },
     ],
   },
 

@@ -12,10 +12,16 @@ export const ROUTES = {
   ADMIN:        "/admin",
   AUDIT:        "/audit",
   OPTIONS:      (symbol: string) => `/options/${symbol}`,
-  DISCOVER:     "/discover",
-  BRIEFING:     "/briefing",
-  LLM:          "/llm",
-  LOGIN:        "/login",
+  DISCOVER:       "/discover",
+  BRIEFING:       "/briefing",
+  LLM:            "/llm",
+  NOTIFICATIONS:         "/notifications",
+  SEND_ALERTS:           "/admin/send-alerts",
+  COPY_TRADING:                 "/copy-trading/connections",
+  COPY_TRADING_TELEGRAM:        "/copy-trading/connections/telegram",
+  COPY_TRADING_DISCORD:         "/copy-trading/connections/discord",
+  COPY_TRADING_DISCORD_RETURN:  "/copy-trading/discord",
+  LOGIN:                        "/login",
 } as const;
 
 // Nav items for sidebar — order matches page map from spec.
@@ -35,6 +41,9 @@ export const NAV_ITEMS = [
   { to: ROUTES.DISCOVER,     label: "Discovery",     icon: "⊹", subtitle: "Find new opportunities across markets" },
   { to: ROUTES.BRIEFING,     label: "Briefing",      icon: "☀", subtitle: "Daily market briefing and outlook" },
   { to: ROUTES.LLM,          label: "LLM Config",    icon: "⊛", subtitle: "Tune the AI models powering the platform" },
+  { to: ROUTES.COPY_TRADING,  label: "Copy Trading",  icon: "⊕", subtitle: "Connect signal sources to copy trades" },
   { to: ROUTES.AUDIT,        label: "Audit Trail",   icon: "≡", subtitle: "Every action, signed and timestamped" },
-  { to: ROUTES.ADMIN,        label: "Admin",         icon: "⚙", subtitle: "Users, roles, and platform configuration" },
+  { to: ROUTES.ADMIN,         label: "Admin",         icon: "⚙", subtitle: "Users, roles, and platform configuration" },
+  { to: ROUTES.SEND_ALERTS,   label: "Send Alerts",   icon: "⊟", subtitle: "Dispatch notifications via Telegram, Discord, or platform", adminOnly: true },
+  { to: ROUTES.NOTIFICATIONS, label: "Notifications",  icon: "◉", subtitle: "Your notification inbox", hidden: true },
 ] as const;
