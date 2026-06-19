@@ -21,6 +21,8 @@ export const ROUTES = {
   COPY_TRADING_TELEGRAM:        "/copy-trading/connections/telegram",
   COPY_TRADING_DISCORD:         "/copy-trading/connections/discord",
   COPY_TRADING_DISCORD_RETURN:  "/copy-trading/discord",
+  COPY_TRADING_VALIDATOR:       "/copy-trading/validator",
+  COPY_TRADING_ORDERS:          "/copy-trading/orders",
   LOGIN:                        "/login",
 } as const;
 

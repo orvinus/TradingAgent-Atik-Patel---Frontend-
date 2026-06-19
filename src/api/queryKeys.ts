@@ -203,6 +203,19 @@ export const qk = {
   discordSources:           ()                           => ["discord-copy", "sources"]            as const,
   discordInvite:            ()                           => ["discord-copy", "invite"]             as const,
 
+  // ── Copy Trading Validator (risk / limits) ─────────────────────────────
+  copyValidatorOptions:     ()                           => ["copy-validator", "options"]          as const,
+  copyValidatorConfig:      ()                           => ["copy-validator", "config"]           as const,
+  copyValidatorSources:     ()                           => ["copy-validator", "sources"]          as const,
+  copyValidatorSource:      (platform: string, sourceId: string) =>
+                                                            ["copy-validator", "sources", platform, sourceId] as const,
+
+  // ── Copy Trading Orders ─────────────────────────────────────────────────
+  copyOrdersSettings:       ()                           => ["copy-orders", "settings"]            as const,
+  copyOrdersBrokers:        ()                           => ["copy-orders", "brokers"]             as const,
+  copyOrdersList:           (status?: string)            => ["copy-orders", "list", status ?? "all"] as const,
+  copyOrder:                (id: string)                 => ["copy-orders", id]                    as const,
+
   // ── Notifications ──────────────────────────────────────────────────────
   notificationsUnreadCount: ()                           => ["notifications", "unread-count"]     as const,
   notificationsInbox:       (offset: number, unreadOnly: boolean, limit: number) =>
