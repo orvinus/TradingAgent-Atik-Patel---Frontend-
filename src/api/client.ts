@@ -49,7 +49,8 @@ export const qk = {
 // src/api/client.ts
 import axios from "axios";
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL ?? "";
+// const backendUrl = import.meta.env.VITE_BACKEND_URL ?? "";
+const backendUrl = import.meta.env.VITE_BACKEND_URL ?? "https://backend.tradingos.co.in";
 const apiPath = import.meta.env.VITE_API_URL ?? "/api/v1";
 
 export const apiClient = axios.create({

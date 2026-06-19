@@ -4,7 +4,8 @@ import path from "path";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const backendUrl = env.VITE_BACKEND_URL;
+  // const backendUrl = env.VITE_BACKEND_URL;
+  const backendUrl = env.VITE_BACKEND_URL ?? "https://backend.tradingos.co.in";
   const dispatchApiKey = env.NOTIFICATIONS_DISPATCH_API_KEY;
 
   return {
