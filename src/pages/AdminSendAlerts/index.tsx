@@ -69,21 +69,21 @@ export default function AdminSendAlerts() {
 
   const dispatchMutation = useMutation({
     mutationFn: async () => {
-      if (audience === "user") {
-        return notificationsApi.adminDispatchToUser({
-          userId: userId.trim(),
-          title: title.trim() || undefined,
-          text: text.trim(),
-          kind,
-          channels,
-        });
-      }
-      return notificationsApi.adminDispatchBroadcast({
-        title: title.trim() || undefined,
+      const trimmedTitle = title.trim();
+      const payload = {
         text: text.trim(),
         kind,
         channels,
-      });
+        ...(trimmedTitle ? { title: trimmedTitle } : {}),
+      };
+
+      if (audience === "user") {
+        return notificationsApi.adminDispatchToUser({
+          userId: userId.trim(),
+          ...payload,
+        });
+      }
+      return notificationsApi.adminDispatchBroadcast(payload);
     },
     onSuccess: (result) => {
       setLastResult(result);

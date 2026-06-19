@@ -23,7 +23,7 @@ import {
 
 // ── Error helpers ─────────────────────────────────────────────────────────────
 
-const DISCORD_ERROR_MESSAGES: Record<string, string> = {
+const DISCORD_ERROR_MESSAGES = {
   DISCORD_USER_DISABLED: "Discord copy trading is not available on this server.",
   DISCORD_NOT_CONNECTED: "Connect your Discord account first.",
   DISCORD_BOT_NOT_IN_GUILD: "Add the TRADING-OS bot to this server first.",
@@ -31,13 +31,15 @@ const DISCORD_ERROR_MESSAGES: Record<string, string> = {
   DISCORD_GUILD_FORBIDDEN: "You are not a member of this server.",
   DISCORD_TOKEN_EXPIRED: "Discord session expired. Please connect again.",
   SOURCE_NOT_FOUND: "Channel already stopped or not found.",
-};
+} satisfies Record<string, string>;
 
 function apiErr(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const d = err.response?.data;
     const code: string | undefined = d?.code;
-    if (code && DISCORD_ERROR_MESSAGES[code]) return DISCORD_ERROR_MESSAGES[code];
+    if (code && code in DISCORD_ERROR_MESSAGES) {
+      return DISCORD_ERROR_MESSAGES[code as keyof typeof DISCORD_ERROR_MESSAGES];
+    }
     return d?.message ?? d?.code ?? "Something went wrong.";
   }
   return "Something went wrong.";
