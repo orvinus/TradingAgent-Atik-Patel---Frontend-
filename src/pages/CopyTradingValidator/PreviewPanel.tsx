@@ -236,7 +236,7 @@ function ResultView({ result, tpList }: { result: ValidateResult; tpList: string
       )}
 
       {/* Violations */}
-      {result.violations.length > 0 && (
+      {(result.violations ?? []).length > 0 && (
         <div className="overflow-hidden rounded-sm border border-border-subtle">
           <table className="w-full border-collapse">
             <thead>
@@ -249,7 +249,7 @@ function ResultView({ result, tpList }: { result: ValidateResult; tpList: string
               </tr>
             </thead>
             <tbody>
-              {result.violations.map((v, i) => (
+              {(result.violations ?? []).map((v, i) => (
                 <tr key={`${v.field}-${i}`} className="border-b border-border-subtle last:border-0">
                   <td className="px-3 py-2 font-mono text-[.64rem] text-text-primary">{v.field}</td>
                   <td className="px-3 py-2 font-mono text-[.62rem] text-text-secondary">{v.message}</td>
