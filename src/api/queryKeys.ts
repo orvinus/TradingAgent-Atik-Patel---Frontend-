@@ -210,6 +210,12 @@ export const qk = {
   copyValidatorSource:      (platform: string, sourceId: string) =>
                                                             ["copy-validator", "sources", platform, sourceId] as const,
 
+  // ── Copy Trading Missing Fields ────────────────────────────────────────────
+  missingFieldsOptions:     ()                           => ["missing-fields", "options"]          as const,
+  missingFieldsConfig:      ()                           => ["missing-fields", "config"]           as const,
+  missingFieldsSource:      (platform: string, sourceId: string) =>
+                                                            ["missing-fields", "sources", platform, sourceId] as const,
+
   // ── Copy Trading Orders ─────────────────────────────────────────────────
   copyOrdersSettings:       ()                           => ["copy-orders", "settings"]            as const,
   copyOrdersBrokers:        ()                           => ["copy-orders", "brokers"]             as const,

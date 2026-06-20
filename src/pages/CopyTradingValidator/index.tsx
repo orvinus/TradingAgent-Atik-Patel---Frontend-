@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { LuArrowLeft, LuLoader } from "react-icons/lu";
+import { LuArrowLeft, LuLoader, LuArrowRight, LuTriangleAlert } from "react-icons/lu";
 import axios from "axios";
 import { copyValidatorApi } from "@/api/endpoints/copyValidator";
 import { qk } from "@/api/queryKeys";
@@ -74,6 +74,25 @@ export default function CopyTradingValidator() {
         <p className="mt-1 font-mono text-[.7rem] text-text-muted">
           Copy signals exactly, or apply per-field risk limits before they become orders.
         </p>
+      </div>
+
+      {/* Missing values callout */}
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-warning/30 bg-warning/5 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <LuTriangleAlert className="h-4 w-4 shrink-0 text-warning" />
+          <div>
+            <p className="font-mono text-[.68rem] font-bold text-text-primary">Missing Values in Copy Trading</p>
+            <p className="font-mono text-[.62rem] text-text-muted">
+              Set defaults for when SL, TP, or lot size is absent from a parsed signal.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate(ROUTES.COPY_TRADING_MISSING_FIELDS)}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-sm border border-warning/40 bg-warning/10 px-3 py-1.5 font-mono text-[.65rem] font-bold uppercase tracking-widest text-warning transition-colors hover:bg-warning/20"
+        >
+          Manage <LuArrowRight className="h-3 w-3" />
+        </button>
       </div>
 
       {/* Settings */}

@@ -15,8 +15,8 @@
   /* ── Text ── */
   --color-text-primary:   #f1f5f9;
   --color-text-secondary: #94a3b8;
-  --color-text-muted:     #475569;
-  --color-text-disabled:  #2d3f55;
+  --color-text-muted:     #6b7f99;
+  --color-text-disabled:  #3d5068;
 
   /* ── Brand / Accent ── */
   --color-accent:         #10b981;
@@ -63,9 +63,9 @@
   --color-border-strong:  #94a3b8;
 
   --color-text-primary:   #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted:     #94a3b8;
-  --color-text-disabled:  #cbd5e1;
+  --color-text-secondary: #334155;
+  --color-text-muted:     #64748b;
+  --color-text-disabled:  #94a3b8;
 
   --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.08);
 }

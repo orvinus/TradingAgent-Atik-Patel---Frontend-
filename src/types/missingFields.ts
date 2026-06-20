@@ -1,0 +1,103 @@
+// src/types/missingFields.ts
+// Types for the Copy Trading Missing Fields API (/copy-trading/missing-fields)
+
+export type WhenMissing = "reject" | "use_default" | "allow_empty";
+
+export type Completeness = "complete" | "partial" | "entry_only" | "invalid";
+
+// ── Config shapes (API) ───────────────────────────────────────────────────────
+
+export interface TpDefaultLevel {
+  pctFromEntry: number;
+  exit_pct: number;
+}
+
+export interface SlFieldConfig {
+  whenMissing: WhenMissing;
+  defaultPctFromEntry?: number;
+  defaultPrice?: number;
+}
+
+export interface TpFieldConfig {
+  whenMissing: WhenMissing;
+  defaultPctFromEntry?: number;
+  defaultPrice?: number;
+  defaultTpLevels?: TpDefaultLevel[];
+}
+
+export interface LotSizeFieldConfig {
+  whenMissing: WhenMissing;
+  defaultLots?: number;
+}
+
+export interface MissingFieldsConfig {
+  sl: SlFieldConfig;
+  tp: TpFieldConfig;
+  lotSize: LotSizeFieldConfig;
+}
+
+// ── Options response ──────────────────────────────────────────────────────────
+
+export interface MissingFieldMeta {
+  key: "sl" | "tp" | "lotSize";
+  label: string;
+  supports: string[];
+}
+
+export interface MissingFieldsOptions {
+  whenMissing: WhenMissing[];
+  fields: MissingFieldMeta[];
+  examples?: Record<string, unknown>;
+}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+
+export interface MissingFieldApplied {
+  field: string;
+  code: string;
+  action: "filled" | "rejected";
+  adjusted?: number | null;
+}
+
+export interface MissingFieldsResultData {
+  applied: MissingFieldApplied[];
+  rejected: MissingFieldApplied[];
+  present: Record<string, boolean>;
+  completeness: Completeness;
+}
+
+export interface PreviewViolation {
+  field: string;
+  code: string;
+  message: string;
+  action: "rejected" | "clamped" | "passed";
+}
+
+export interface MissingFieldsPreviewResult {
+  valid: boolean;
+  executionMode?: string;
+  adjusted?: {
+    symbol?: string;
+    side?: string;
+    limit_price?: number | null;
+    sl_price?: number | null;
+    tp_price?: number | null;
+    lot_size?: number | null;
+  };
+  violations: PreviewViolation[];
+  missingFields: MissingFieldsResultData;
+  summary?: string;
+}
+
+export interface MissingFieldsPreviewResponse {
+  result: MissingFieldsPreviewResult;
+  configUsed?: Record<string, unknown>;
+}
+
+// ── Source override ───────────────────────────────────────────────────────────
+
+export interface MissingFieldsSourceConfig {
+  inheritsFromGlobal?: boolean;
+  effectiveMissingFields?: MissingFieldsConfig;
+  missingFields?: MissingFieldsConfig;
+}
