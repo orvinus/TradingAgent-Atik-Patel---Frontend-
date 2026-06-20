@@ -26,7 +26,12 @@ export const copyOrdersApi = {
   },
 
   updateSettings: async (body: Partial<OrderSettings>): Promise<OrderSettings> => {
-    const { data } = await apiClient.put(`${BASE}/settings`, body);
+    const { broker, brokerConnectionId, orderExecutionMode } = body;
+    const payload: Partial<OrderSettings> = {};
+    if (broker !== undefined) payload.broker = broker;
+    if (brokerConnectionId !== undefined) payload.brokerConnectionId = brokerConnectionId;
+    if (orderExecutionMode !== undefined) payload.orderExecutionMode = orderExecutionMode;
+    const { data } = await apiClient.put(`${BASE}/settings`, payload);
     const d = unwrap<{ settings?: OrderSettings } & OrderSettings>(data);
     return (d?.settings ?? d ?? body) as OrderSettings;
   },
@@ -60,9 +65,10 @@ export const copyOrdersApi = {
   },
 
   confirm: async (id: string, userEdits?: OrderEdits): Promise<CopyOrder> => {
+    const hasEdits = userEdits && Object.keys(userEdits).length > 0;
     const { data } = await apiClient.post(
       `${BASE}/${encodeURIComponent(id)}/confirm`,
-      userEdits ? { userEdits } : {},
+      hasEdits ? { userEdits } : {},
     );
     const d = unwrap<{ order?: CopyOrder } & CopyOrder>(data);
     return (d?.order ?? d) as CopyOrder;

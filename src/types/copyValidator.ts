@@ -154,30 +154,60 @@ export type CopyOrderStatus =
   | "failed"
   | "cancelled";
 
+export interface TpLevel {
+  level: number;
+  exit_pct: number;
+  move_sl_to: number | null;
+}
+
+export interface OrderPreview {
+  qty: number | null;
+  side: "buy" | "sell";
+  symbol: string;
+  summary: string | null;
+  lot_size?: number | null;
+  raw_text?: string | null;
+  sl_price: number | null;
+  tp_price: number | null;
+  tp_levels: TpLevel[] | null;
+  order_type: string | null;
+  asset_class?: string | null;
+  limit_price: number | null;
+  time_in_force?: string | null;
+}
+
+export interface UserEditedOrder {
+  qty?: number | null;
+  symbol?: string | null;
+  sl_price?: number | null;
+  limit_price?: number | null;
+}
+
 export interface CopyOrder {
   id: string;
-  symbol: string;
-  side: "buy" | "sell";
-  entry?: number | null;
-  sl?: number | null;
-  tp?: number[] | number | null;
-  tpLevels?: number[] | null;
-  qty?: number | null;
-  orderType?: string | null;
-  status: CopyOrderStatus;
+  platform?: "telegram" | "discord" | null;
   broker?: string | null;
   brokerConnectionId?: string | null;
+  status: CopyOrderStatus;
+  executionMode?: string | null;
+  validatorValid?: boolean | null;
+  validatorResult?: ValidateResult | null;
+  orderPreview?: OrderPreview | null;
+  userEditedOrder?: UserEditedOrder | null;
   brokerOrderId?: string | null;
-  summary?: string | null;
-  validation?: ValidateResult | null;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  confirmedAt?: string | null;
+  submittedAt?: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // Editable subset for PATCH /orders/:id and confirm userEdits.
 export interface OrderEdits {
   qty?: number;
-  entry?: number;
-  sl?: number;
+  limit_price?: number;
+  sl_price?: number;
   tp?: number[];
   symbol?: string;
 }

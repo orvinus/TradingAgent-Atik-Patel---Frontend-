@@ -6,7 +6,7 @@ import axios from "axios";
 import { copyOrdersApi } from "@/api/endpoints/copyOrders";
 import { qk } from "@/api/queryKeys";
 import { toast } from "@/components/ui/Toast";
-import type { CopyOrder, OrderEdits } from "@/types/copyValidator";
+import type { OrderEdits, TpLevel } from "@/types/copyValidator";
 
 function brokerErrMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
@@ -27,9 +27,9 @@ const num = (s: string): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const tpToText = (tp: CopyOrder["tp"], levels: CopyOrder["tpLevels"]): string => {
-  const arr = levels ?? (Array.isArray(tp) ? tp : tp != null ? [tp] : []);
-  return arr && arr.length ? arr.join(", ") : "—";
+const tpToText = (tp_price: number | null | undefined, levels: TpLevel[] | null | undefined): string => {
+  if (levels && levels.length) return levels.map((l) => l.level).join(", ");
+  return tp_price != null ? String(tp_price) : "—";
 };
 
 export default function ConfirmOrderModal({ orderId, onClose }: { orderId: string; onClose: () => void }) {
@@ -51,11 +51,19 @@ export default function ConfirmOrderModal({ orderId, onClose }: { orderId: strin
 
   useEffect(() => {
     if (order) {
+      const preview = order.orderPreview;
+      const edited = order.userEditedOrder;
       setEdits({
-        symbol: order.symbol ?? "",
-        entry: order.entry != null ? String(order.entry) : "",
-        sl: order.sl != null ? String(order.sl) : "",
-        qty: order.qty != null ? String(order.qty) : "",
+        symbol: edited?.symbol ?? preview?.symbol ?? "",
+        entry: (edited?.limit_price ?? preview?.limit_price) != null
+          ? String(edited?.limit_price ?? preview?.limit_price)
+          : "",
+        sl: (edited?.sl_price ?? preview?.sl_price) != null
+          ? String(edited?.sl_price ?? preview?.sl_price)
+          : "",
+        qty: (edited?.qty ?? preview?.qty) != null
+          ? String(edited?.qty ?? preview?.qty)
+          : "",
       });
     }
   }, [order]);
@@ -64,9 +72,9 @@ export default function ConfirmOrderModal({ orderId, onClose }: { orderId: strin
     const e: OrderEdits = {};
     if (edits.symbol.trim()) e.symbol = edits.symbol.trim();
     const entry = num(edits.entry);
-    if (entry != null) e.entry = entry;
+    if (entry != null) e.limit_price = entry;
     const sl = num(edits.sl);
-    if (sl != null) e.sl = sl;
+    if (sl != null) e.sl_price = sl;
     const qty = num(edits.qty);
     if (qty != null) e.qty = qty;
     return e;
@@ -109,7 +117,7 @@ export default function ConfirmOrderModal({ orderId, onClose }: { orderId: strin
   });
 
   const busy = draftMut.isPending || confirmMut.isPending || cancelMut.isPending;
-  const valid = order?.validation?.valid;
+  const valid = order?.validatorResult?.valid;
 
   return (
     <div className="fixed inset-0 z-[900] flex items-start justify-center overflow-y-auto bg-black/60 p-4 sm:p-8" onClick={onClose}>
@@ -133,7 +141,7 @@ export default function ConfirmOrderModal({ orderId, onClose }: { orderId: strin
           ) : (
             <>
               {/* Validation badge */}
-              {order.validation && (
+              {order.validatorResult && (
                 <div
                   className={`mb-4 flex items-center gap-2 rounded-sm border px-3 py-2 ${
                     valid ? "border-bull/30 bg-bull/10" : "border-bear/30 bg-bear/10"
@@ -143,8 +151,8 @@ export default function ConfirmOrderModal({ orderId, onClose }: { orderId: strin
                   <span className={`font-mono text-[.68rem] font-bold ${valid ? "text-bull" : "text-bear"}`}>
                     {valid ? "Validation passed" : "Validation failed"}
                   </span>
-                  {order.validation.summary && (
-                    <span className="font-mono text-[.62rem] text-text-secondary">— {order.validation.summary}</span>
+                  {order.validatorResult.summary && (
+                    <span className="font-mono text-[.62rem] text-text-secondary">— {order.validatorResult.summary}</span>
                   )}
                 </div>
               )}
@@ -153,18 +161,23 @@ export default function ConfirmOrderModal({ orderId, onClose }: { orderId: strin
                 <EditRow label="Symbol">
                   <input className={inputCls} value={edits.symbol} disabled={busy} onChange={(e) => setEdits({ ...edits, symbol: e.target.value })} />
                 </EditRow>
-                <StaticRow label="Side" value={(order.side ?? "").toUpperCase()} />
-                <EditRow label="Entry">
+                <StaticRow label="Side" value={(order.orderPreview?.side ?? "").toUpperCase()} />
+                <EditRow label="Entry (limit)">
                   <input className={inputCls} type="number" value={edits.entry} disabled={busy} onChange={(e) => setEdits({ ...edits, entry: e.target.value })} />
                 </EditRow>
                 <EditRow label="Stop loss">
                   <input className={inputCls} type="number" value={edits.sl} disabled={busy} onChange={(e) => setEdits({ ...edits, sl: e.target.value })} />
                 </EditRow>
-                <StaticRow label="Take profit" value={tpToText(order.tp, order.tpLevels)} />
+                <StaticRow label="Take profit" value={tpToText(order.orderPreview?.tp_price, order.orderPreview?.tp_levels)} />
                 <EditRow label="Quantity">
                   <input className={inputCls} type="number" value={edits.qty} disabled={busy} onChange={(e) => setEdits({ ...edits, qty: e.target.value })} />
                 </EditRow>
-                <StaticRow label="Broker" value={order.broker ?? "Alpaca"} />
+                <StaticRow label="Broker" value={order.broker ?? "—"} />
+                {order.errorMessage && (
+                  <div className="mt-1 rounded-sm border border-bear/30 bg-bear/10 px-3 py-2 font-mono text-[.63rem] text-bear">
+                    {order.errorMessage}
+                  </div>
+                )}
               </dl>
             </>
           )}

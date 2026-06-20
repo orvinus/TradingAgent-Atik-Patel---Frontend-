@@ -8,7 +8,7 @@ import { copyOrdersApi } from "@/api/endpoints/copyOrders";
 import { qk } from "@/api/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { toast } from "@/components/ui/Toast";
-import type { CopyOrder, CopyOrderStatus, OrderExecutionMode, OrderSettings } from "@/types/copyValidator";
+import type { CopyOrder, CopyOrderStatus, OrderExecutionMode, OrderSettings, TpLevel } from "@/types/copyValidator";
 import ConfirmOrderModal from "./ConfirmOrderModal";
 
 function apiErr(err: unknown): string {
@@ -226,8 +226,8 @@ export default function CopyTradingOrders() {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border-subtle text-left">
-                  {["Time", "Symbol", "Side", "Status", "Summary", ""].map((h) => (
-                    <th key={h} className="px-3 py-2 font-mono text-[.54rem] uppercase tracking-[.14em] text-text-muted">
+                  {["Time", "Platform", "Symbol", "Side", "Entry", "SL", "TP", "Qty", "Status", "Notes", ""].map((h) => (
+                    <th key={h} className="px-3 py-2 font-mono text-[.54rem] uppercase tracking-[.14em] text-text-muted whitespace-nowrap">
                       {h}
                     </th>
                   ))}
@@ -248,19 +248,52 @@ export default function CopyTradingOrders() {
   );
 }
 
+function tpText(tp_price: number | null | undefined, tp_levels: TpLevel[] | null | undefined): string {
+  if (tp_levels && tp_levels.length) return tp_levels.map((l) => l.level).join(", ");
+  return tp_price != null ? String(tp_price) : "—";
+}
+
 function OrderRow({ order, onConfirm }: { order: CopyOrder; onConfirm: () => void }) {
   const pending = order.status === "pending_confirmation";
+  const p = order.orderPreview;
+  const side = p?.side ?? "";
+
+  const notes = order.errorMessage
+    ? order.errorMessage
+    : order.brokerOrderId
+      ? `#${order.brokerOrderId.slice(0, 8)}`
+      : p?.summary ?? "—";
+
   return (
-    <tr className="border-b border-border-subtle last:border-0">
-      <td className="px-3 py-2 font-mono text-[.62rem] text-text-muted">{new Date(order.createdAt).toLocaleString()}</td>
-      <td className="px-3 py-2 font-mono text-[.66rem] text-text-primary">{order.symbol}</td>
-      <td className="px-3 py-2 font-mono text-[.64rem] text-text-secondary">{(order.side ?? "").toUpperCase()}</td>
+    <tr className="border-b border-border-subtle last:border-0 hover:bg-bg-elevated/40">
+      <td className="whitespace-nowrap px-3 py-2 font-mono text-[.62rem] text-text-muted">
+        {new Date(order.createdAt).toLocaleString()}
+      </td>
+      <td className="px-3 py-2">
+        {order.platform && (
+          <span className="rounded-sm border border-border-default px-1.5 py-0.5 font-mono text-[.5rem] uppercase tracking-widest text-text-muted">
+            {order.platform}
+          </span>
+        )}
+      </td>
+      <td className="px-3 py-2 font-mono text-[.66rem] font-bold text-text-primary">{p?.symbol ?? "—"}</td>
+      <td className="px-3 py-2">
+        <span className={`font-mono text-[.64rem] font-bold ${side === "buy" ? "text-bull" : side === "sell" ? "text-bear" : "text-text-muted"}`}>
+          {side ? side.toUpperCase() : "—"}
+        </span>
+      </td>
+      <td className="px-3 py-2 font-mono text-[.63rem] text-text-secondary">{p?.limit_price ?? "—"}</td>
+      <td className="px-3 py-2 font-mono text-[.63rem] text-bear">{p?.sl_price ?? "—"}</td>
+      <td className="px-3 py-2 font-mono text-[.63rem] text-bull whitespace-nowrap">{tpText(p?.tp_price, p?.tp_levels)}</td>
+      <td className="px-3 py-2 font-mono text-[.63rem] text-text-secondary">{p?.qty ?? "—"}</td>
       <td className="px-3 py-2">
         <span className={`rounded-sm border px-2 py-0.5 font-mono text-[.52rem] uppercase tracking-widest ${STATUS_STYLE[order.status] ?? "text-text-muted"}`}>
           {order.status.replace(/_/g, " ")}
         </span>
       </td>
-      <td className="px-3 py-2 font-mono text-[.62rem] text-text-muted">{order.summary ?? "—"}</td>
+      <td className={`max-w-[14rem] truncate px-3 py-2 font-mono text-[.61rem] ${order.errorMessage ? "text-bear" : "text-text-muted"}`} title={notes}>
+        {notes}
+      </td>
       <td className="px-3 py-2 text-right">
         <button
           onClick={onConfirm}
