@@ -3,7 +3,7 @@ import { apiClient } from "@/api/client";
 import type {
   CopyOrder,
   CopyOrderStatus,
-  OrderBrokerOption,
+  OrderBroker,
   OrderEdits,
   OrderSettings,
 } from "@/types/copyValidator";
@@ -31,12 +31,12 @@ export const copyOrdersApi = {
     return (d?.settings ?? d ?? body) as OrderSettings;
   },
 
-  // GET /orders/brokers — broker connections eligible for copy orders.
-  listBrokers: async (): Promise<OrderBrokerOption[]> => {
+  // GET /orders/brokers — { success, data: { brokers: [{ id, name, available, connections: [...] }] } }
+  listBrokers: async (): Promise<OrderBroker[]> => {
     const { data } = await apiClient.get(`${BASE}/brokers`);
     const d = unwrap<unknown>(data);
-    if (Array.isArray(d)) return d as OrderBrokerOption[];
-    return (d as { brokers?: OrderBrokerOption[] })?.brokers ?? [];
+    if (Array.isArray(d)) return d as OrderBroker[];
+    return (d as { brokers?: OrderBroker[] })?.brokers ?? [];
   },
 
   // ── Orders ───────────────────────────────────────────────────────────────

@@ -120,17 +120,31 @@ export interface SourceConfigSummary {
 export type OrderExecutionMode = "auto" | "manual_confirm";
 
 export interface OrderSettings {
-  broker: "alpaca";
+  broker: string;
   brokerConnectionId: string | null;
   orderExecutionMode: OrderExecutionMode;
 }
 
-export interface OrderBrokerOption {
-  brokerConnectionId: string;
-  broker: string;
-  displayName: string;
+// Connection item inside broker.connections[] from GET /copy-trading/orders/brokers.
+export interface OrderBrokerConnection {
+  id: string;
+  display_name: string;
   environment?: string;
+  status?: string;
+  key_fingerprint?: string;
 }
+
+// Broker item from GET /copy-trading/orders/brokers.
+export interface OrderBroker {
+  id: string;
+  name: string;
+  description?: string;
+  available: boolean;
+  connections: OrderBrokerConnection[];
+}
+
+// Legacy alias kept for any other imports.
+export type OrderBrokerOption = OrderBrokerConnection;
 
 export type CopyOrderStatus =
   | "pending_confirmation"

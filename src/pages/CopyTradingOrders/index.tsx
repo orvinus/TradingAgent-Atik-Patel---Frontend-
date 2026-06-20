@@ -49,14 +49,26 @@ export default function CopyTradingOrders() {
   const brokersQuery = useQuery({ queryKey: qk.copyOrdersBrokers(), queryFn: copyOrdersApi.listBrokers });
 
   const [settings, setSettings] = useState<OrderSettings>({
-    broker: "alpaca",
+    broker: "",
     brokerConnectionId: null,
     orderExecutionMode: "manual_confirm",
   });
 
+  const brokers = brokersQuery.data ?? [];
+  const selectedBroker = brokers.find((b) => b.id === settings.broker);
+  const connections = selectedBroker?.connections ?? [];
+
   useEffect(() => {
     if (settingsQuery.data) setSettings(settingsQuery.data);
   }, [settingsQuery.data]);
+
+  // Pre-select the first available broker when no saved setting exists.
+  useEffect(() => {
+    if (!settings.broker && brokers.length) {
+      const first = brokers.find((b) => b.available) ?? brokers[0];
+      if (first) setSettings((s) => ({ ...s, broker: first.id }));
+    }
+  }, [brokers, settings.broker]);
 
   const saveMut = useMutation({
     mutationFn: (body: Partial<OrderSettings>) => copyOrdersApi.updateSettings(body),
@@ -104,10 +116,18 @@ export default function CopyTradingOrders() {
                 <span className="font-mono text-[.58rem] uppercase tracking-[.18em] text-text-disabled">Broker</span>
                 <select
                   value={settings.broker}
-                  onChange={(e) => setSettings({ ...settings, broker: e.target.value as "alpaca" })}
+                  onChange={(e) => setSettings({ ...settings, broker: e.target.value, brokerConnectionId: null })}
+                  disabled={brokersQuery.isLoading}
                   className={selectCls}
                 >
-                  <option value="alpaca">Alpaca</option>
+                  <option value="">
+                    {brokersQuery.isLoading ? "Loading…" : "Select a broker…"}
+                  </option>
+                  {brokers.map((b) => (
+                    <option key={b.id} value={b.id} disabled={!b.available}>
+                      {b.name}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -116,16 +136,22 @@ export default function CopyTradingOrders() {
                 <select
                   value={settings.brokerConnectionId ?? ""}
                   onChange={(e) => setSettings({ ...settings, brokerConnectionId: e.target.value || null })}
-                  disabled={brokersQuery.isLoading}
+                  disabled={brokersQuery.isLoading || !settings.broker || connections.length === 0}
                   className={selectCls}
                 >
                   <option value="">
-                    {brokersQuery.isLoading ? "Loading connections…" : "Select a connection…"}
+                    {brokersQuery.isLoading
+                      ? "Loading connections…"
+                      : !settings.broker
+                        ? "Select a broker first…"
+                        : connections.length === 0
+                          ? "No connections available"
+                          : "Select a connection…"}
                   </option>
-                  {(brokersQuery.data ?? []).map((b) => (
-                    <option key={b.brokerConnectionId} value={b.brokerConnectionId}>
-                      {b.displayName}
-                      {b.environment ? ` (${b.environment})` : ""}
+                  {connections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.display_name}
+                      {c.environment ? ` (${c.environment})` : ""}
                     </option>
                   ))}
                 </select>
