@@ -157,7 +157,7 @@ export type CopyOrderStatus =
 export interface TpLevel {
   level: number;
   exit_pct: number;
-  move_sl_to: number | null;
+  move_sl_to: string | null;
 }
 
 export interface OrderPreview {
@@ -208,7 +208,8 @@ export interface OrderEdits {
   qty?: number;
   limit_price?: number;
   sl_price?: number;
-  tp?: number[];
+  tp_price?: number;
+  tp_levels?: Array<{ level: number; exit_pct: number; move_sl_to: string | null }>;
   symbol?: string;
 }
 
