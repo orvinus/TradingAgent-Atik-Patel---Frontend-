@@ -39,6 +39,14 @@ function isBrokerType(v: string | undefined): v is BrokerType {
   return !!v && INTEGRATED_BROKERS.has(v as BrokerType);
 }
 
+// The API can return enum-prefixed strings like "ORDERSIDE.buy" or "ORDERTYPE.limit".
+// These helpers extract the plain value after the last dot.
+const normSide = (raw: string | undefined): string =>
+  (raw?.split(".").pop() ?? "").toLowerCase();
+
+const normEnum = (raw: string | undefined): string =>
+  raw?.split(".").pop()?.toUpperCase() ?? "—";
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function BrokerDetail() {
@@ -544,7 +552,7 @@ function OrdersTable({
     () =>
       orders.filter((o) => {
         if (search && !(o.symbol ?? "").toUpperCase().includes(search)) return false;
-        if (side !== "all" && o.side !== side) return false;
+        if (side !== "all" && normSide(o.side) !== side) return false;
         return true;
       }),
     [orders, search, side],
@@ -558,7 +566,7 @@ function OrdersTable({
       <table className="w-full text-left">
         <thead>
           <tr className="border-b border-border-subtle">
-            {["Symbol", "Side", "Type", "Qty", "Limit", "Status", "Submitted", ""].map((h) => (
+            {["Symbol", "Side", "Type", "Qty", "Limit", "Stop", "Status", ""].map((h) => (
               <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
                 {h}
               </th>
@@ -592,28 +600,29 @@ function OrderRow({
   cancelling: boolean;
   statusColor: (s: string) => string;
 }) {
-  const canCancel = !["filled", "canceled", "expired", "replaced"].includes(order.status);
+  const OPEN_STATUSES = new Set(["new", "accepted", "pending_new", "partially_filled", "submitted", "open", "held"]);
+  const canCancel = OPEN_STATUSES.has((order.status ?? "").toLowerCase());
 
   return (
     <tr className="border-b border-border-subtle last:border-0">
       <td className="py-2.5 pr-4 font-display text-sm font-bold uppercase tracking-wider text-text-primary">
         {order.symbol ?? "—"}
       </td>
-      <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${order.side === "buy" ? "text-bull" : "text-bear"}`}>
-        {order.side?.toUpperCase() ?? "—"}
+      <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${normSide(order.side) === "buy" ? "text-bull" : "text-bear"}`}>
+        {normEnum(order.side)}
       </td>
       <td className="py-2.5 pr-4 font-mono text-[.68rem] uppercase tracking-widest text-text-secondary">
-        {order.order_type ?? "—"}
+        {normEnum(order.order_type)}
       </td>
       <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">{order.qty ?? order.notional ?? "—"}</td>
       <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
         {order.limit_price ? `$${order.limit_price}` : "—"}
       </td>
+      <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
+        {order.stop_price ? `$${order.stop_price}` : "—"}
+      </td>
       <td className={`py-2.5 pr-4 font-mono text-[.62rem] uppercase tracking-widest ${statusColor(order.status)}`}>
         {order.status}
-      </td>
-      <td className="py-2.5 pr-4 font-mono text-[.62rem] text-text-disabled">
-        {new Date(order.submitted_at).toLocaleString()}
       </td>
       <td className="py-2.5">
         {canCancel && (
@@ -656,7 +665,7 @@ function FillsTable({
     () =>
       fills.filter((f) => {
         if (search && !f.symbol.toUpperCase().includes(search)) return false;
-        if (side !== "all" && f.side !== side) return false;
+        if (side !== "all" && normSide(f.side) !== side) return false;
         return true;
       }),
     [fills, search, side],
@@ -683,8 +692,8 @@ function FillsTable({
               <td className="py-2.5 pr-4 font-display text-sm font-bold uppercase tracking-wider text-text-primary">
                 {fill.symbol}
               </td>
-              <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${fill.side === "buy" ? "text-bull" : "text-bear"}`}>
-                {fill.side.toUpperCase()}
+              <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${normSide(fill.side) === "buy" ? "text-bull" : "text-bear"}`}>
+                {normEnum(fill.side)}
               </td>
               <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">{fill.qty}</td>
               <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
