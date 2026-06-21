@@ -199,6 +199,7 @@ export interface AlpacaOrder {
   qty?: string;
   notional?: string;
   limit_price?: string;
+  stop_price?: string;
   filled_qty?: string;
   filled_avg_price?: string;
   child_order_ids: string[];

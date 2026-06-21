@@ -9,6 +9,7 @@ const Dashboard       = lazy(() => import("@/pages/Dashboard/index"));
 const TradingMode     = lazy(() => import("@/pages/TradingMode/index"));
 const Strategies      = lazy(() => import("@/pages/Strategies/index"));
 const Brokers         = lazy(() => import("@/pages/Brokers/index"));
+const BrokerDetail    = lazy(() => import("@/pages/BrokerDetail/index"));
 const Backtest        = lazy(() => import("@/pages/Backtest/index"));
 const Risk            = lazy(() => import("@/pages/Risk/index"));
 const News            = lazy(() => import("@/pages/News/index"));
@@ -139,6 +140,7 @@ export const router = createBrowserRouter([
       { path: "/mode",            element: <Page component={TradingMode}  /> },
       { path: "/strategies",      element: <Page component={Strategies}   /> },
       { path: "/brokers",         element: <Page component={Brokers}      /> },
+      { path: "/brokers/:brokerId", element: <Page component={BrokerDetail} /> },
       { path: "/backtest",        element: <Page component={Backtest}     /> },
       { path: "/risk",            element: <Page component={Risk}         /> },
       { path: "/news",            element: <Page component={News}         /> },

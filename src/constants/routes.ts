@@ -4,6 +4,7 @@ export const ROUTES = {
   MODE:         "/mode",
   STRATEGIES:   "/strategies",
   BROKERS:      "/brokers",
+  BROKER_DETAIL: (brokerId: string) => `/brokers/${brokerId}`,
   BACKTEST:     "/backtest",
   RISK:         "/risk",
   NEWS:         "/news",
