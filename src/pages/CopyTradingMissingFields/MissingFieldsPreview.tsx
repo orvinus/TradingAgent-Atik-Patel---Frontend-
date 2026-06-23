@@ -86,6 +86,33 @@ function ResultPanel({ result }: { result: MissingFieldsPreviewResult }) {
               </tr>
             </thead>
             <tbody>
+              {/* Entry row */}
+              {(() => {
+                const entryApplied = appliedMap.get("entry");
+                const isMarket = adjusted.order_type === "market" || adjusted.entry_display === "market";
+                const entryValue = isMarket ? null : adjusted.limit_price;
+                return (
+                  <tr className="border-b border-border-subtle">
+                    <td className="px-3 py-2 font-mono text-[.64rem] text-text-muted">Entry / limit price</td>
+                    <td className="px-3 py-2 font-mono text-[.68rem] font-bold text-text-primary">
+                      {isMarket ? (
+                        <span className="rounded-sm border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[.54rem] uppercase tracking-widest text-amber-400">
+                          MARKET
+                        </span>
+                      ) : (
+                        fmt(entryValue)
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {entryApplied ? (
+                        <DefaultChip label="default" />
+                      ) : (
+                        <span className="font-mono text-[.58rem] text-text-muted">from signal</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })()}
               {[
                 { field: "sl", label: "Stop loss",    value: adjusted.sl_price,    apiKey: "sl" },
                 { field: "tp", label: "Take profit",  value: adjusted.tp_price,    apiKey: "tp" },
@@ -100,17 +127,7 @@ function ResultPanel({ result }: { result: MissingFieldsPreviewResult }) {
                     </td>
                     <td className="px-3 py-2">
                       {applied ? (
-                        <DefaultChip
-                          label={
-                            applied.code === "DEFAULT_SL_APPLIED"
-                              ? "default"
-                              : applied.code === "DEFAULT_TP_APPLIED"
-                                ? "default"
-                                : applied.code === "DEFAULT_LOT_APPLIED"
-                                  ? "default"
-                                  : "default"
-                          }
-                        />
+                        <DefaultChip label="default" />
                       ) : (
                         <span className="font-mono text-[.58rem] text-text-muted">from signal</span>
                       )}
@@ -156,27 +173,42 @@ function ResultPanel({ result }: { result: MissingFieldsPreviewResult }) {
   );
 }
 
+type EntryScenario = "has_limit" | "no_price" | "market";
+
+const SCENARIO_LABELS: Record<EntryScenario, string> = {
+  has_limit: "Has limit price",
+  no_price:  "No price",
+  market:    "Explicit market",
+};
+
 export default function MissingFieldsPreview() {
-  const [symbol, setSymbol]   = useState("AAPL");
-  const [entry, setEntry]     = useState("225");
-  const [side, setSide]       = useState<"buy" | "sell">("buy");
-  const [result, setResult]   = useState<MissingFieldsPreviewResult | null>(null);
-  const [previewErr, setPreviewErr] = useState<string | null>(null);
+  const [symbol, setSymbol]           = useState("AAPL");
+  const [entry, setEntry]             = useState("225");
+  const [side, setSide]               = useState<"buy" | "sell">("buy");
+  const [scenario, setScenario]       = useState<EntryScenario>("has_limit");
+  const [result, setResult]           = useState<MissingFieldsPreviewResult | null>(null);
+  const [previewErr, setPreviewErr]   = useState<string | null>(null);
+
+  const buildSignal = () => {
+    const base = {
+      parseable: true,
+      symbol: symbol.trim() || "AAPL",
+      side,
+      sl_price: null,
+      tp_price: null,
+      tp_levels: null,
+    };
+    if (scenario === "has_limit") {
+      return { ...base, order_type: "limit", limit_price: parseFloat(entry) || 225 };
+    }
+    if (scenario === "market") {
+      return { ...base, order_type: "market", limit_price: null };
+    }
+    return { ...base, order_type: null, limit_price: null };
+  };
 
   const previewMut = useMutation({
-    mutationFn: () =>
-      missingFieldsApi.preview({
-        signal: {
-          parseable: true,
-          symbol: symbol.trim() || "AAPL",
-          side,
-          order_type: "limit",
-          limit_price: parseFloat(entry) || 225,
-          sl_price: null,
-          tp_price: null,
-          tp_levels: null,
-        },
-      }),
+    mutationFn: () => missingFieldsApi.preview({ signal: buildSignal() }),
     onSuccess: (data) => {
       setResult(data.result);
       setPreviewErr(null);
@@ -200,6 +232,27 @@ export default function MissingFieldsPreview() {
         Test how your defaults apply to an incomplete signal before going live.
       </p>
 
+      {/* Entry scenario quick-test buttons */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="font-mono text-[.56rem] uppercase tracking-widest text-text-muted">Entry scenario:</span>
+        {(["has_limit", "no_price", "market"] as EntryScenario[]).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setScenario(s)}
+            className={`rounded-sm border px-2.5 py-1 font-mono text-[.6rem] transition-colors ${
+              scenario === s
+                ? s === "market"
+                  ? "border-amber-500/60 bg-amber-500/15 text-amber-300"
+                  : "border-accent/60 bg-accent/15 text-accent"
+                : "border-border-default text-text-secondary hover:border-accent hover:text-accent"
+            }`}
+          >
+            {SCENARIO_LABELS[s]}
+          </button>
+        ))}
+      </div>
+
       {/* Signal inputs */}
       <div className="flex flex-wrap items-end gap-4">
         <label className="flex flex-col gap-1">
@@ -222,16 +275,26 @@ export default function MissingFieldsPreview() {
             className={inputCls}
           />
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-mono text-[.56rem] uppercase tracking-widest text-text-muted">Entry price</span>
-          <input
-            type="number"
-            value={entry}
-            onChange={(e) => setEntry(e.target.value)}
-            placeholder="225"
-            className={inputCls}
-          />
-        </label>
+        {scenario === "has_limit" && (
+          <label className="flex flex-col gap-1">
+            <span className="font-mono text-[.56rem] uppercase tracking-widest text-text-muted">Entry price</span>
+            <input
+              type="number"
+              value={entry}
+              onChange={(e) => setEntry(e.target.value)}
+              placeholder="225"
+              className={inputCls}
+            />
+          </label>
+        )}
+        {scenario !== "has_limit" && (
+          <div className="flex flex-col gap-1">
+            <span className="font-mono text-[.56rem] uppercase tracking-widest text-text-disabled">Entry price</span>
+            <span className="font-mono text-[.65rem] italic text-text-muted">
+              {scenario === "market" ? "market order" : "missing (no price in signal)"}
+            </span>
+          </div>
+        )}
         <div className="flex flex-col gap-1">
           <span className="font-mono text-[.56rem] uppercase tracking-widest text-text-disabled">SL / TP / Lots</span>
           <span className="font-mono text-[.65rem] italic text-text-muted">missing (none in signal)</span>

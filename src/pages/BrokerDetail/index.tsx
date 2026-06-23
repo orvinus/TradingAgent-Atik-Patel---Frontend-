@@ -2,16 +2,16 @@
 // Dedicated per-broker management page. Reached from the Brokers list via
 // "Manage". Shows the broker overview on top and a single filterable table
 // below with Positions / Orders / Fills views.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useIsFetching } from "@tanstack/react-query";
 import axios from "axios";
 import { allBrokersApi } from "@/api/endpoints/brokers";
 import { qk } from "@/api/queryKeys";
 import { toast } from "@/components/ui/Toast";
 import {
   LuLoader, LuPlus, LuRefreshCw, LuCheck, LuX, LuArrowLeft,
-  LuTrash2, LuSearch,
+  LuTrash2, LuSearch, LuChevronLeft, LuChevronRight,
 } from "react-icons/lu";
 import {
   getBrokerInfo,
@@ -314,6 +314,17 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
     { id: "fills",     label: "Fills"          },
   ];
 
+  const activeQueryKey =
+    view === "positions" ? positionsKey(broker, cid)
+    : view === "orders"  ? ordersKey(broker, cid, orderStatus)
+    : fillsKey(broker, cid);
+
+  const isFetching = useIsFetching({ queryKey: activeQueryKey }) > 0;
+
+  function handleRefresh() {
+    qc.invalidateQueries({ queryKey: activeQueryKey });
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle pb-2">
@@ -323,13 +334,24 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
             Activity
           </h2>
         </div>
-        <button
-          onClick={() => setShowSubmit(true)}
-          className="flex items-center gap-1.5 rounded-sm bg-accent px-3 py-1.5 font-mono text-[.68rem] font-bold uppercase tracking-widest text-bg-base transition-colors hover:bg-accent-hover"
-        >
-          <LuPlus className="h-3.5 w-3.5" />
-          New Order
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={isFetching}
+            title="Refresh"
+            className="flex items-center gap-1.5 rounded-sm border border-border-default bg-bg-elevated px-3 py-1.5 font-mono text-[.68rem] uppercase tracking-widest text-text-secondary transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <LuRefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+          <button
+            onClick={() => setShowSubmit(true)}
+            className="flex items-center gap-1.5 rounded-sm bg-accent px-3 py-1.5 font-mono text-[.68rem] font-bold uppercase tracking-widest text-bg-base transition-colors hover:bg-accent-hover"
+          >
+            <LuPlus className="h-3.5 w-3.5" />
+            New Order
+          </button>
+        </div>
       </div>
 
       {/* View tabs */}
@@ -454,10 +476,55 @@ function TableLoader() {
   );
 }
 
+const PAGE_SIZE = 20;
+
+function Pagination({
+  page,
+  total,
+  onPage,
+}: {
+  page: number;
+  total: number;
+  onPage: (p: number) => void;
+}) {
+  const pages = Math.ceil(total / PAGE_SIZE);
+  if (pages <= 1) return null;
+  const start = (page - 1) * PAGE_SIZE + 1;
+  const end = Math.min(page * PAGE_SIZE, total);
+
+  return (
+    <div className="mt-4 flex items-center justify-between border-t border-border-subtle pt-3">
+      <span className="font-mono text-[.6rem] uppercase tracking-widest text-text-disabled">
+        {start}–{end} of {total}
+      </span>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPage(page - 1)}
+          disabled={page === 1}
+          className="flex items-center gap-1 rounded-sm border border-border-default px-2 py-1 font-mono text-[.62rem] uppercase tracking-widest text-text-muted transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          <LuChevronLeft className="h-3 w-3" /> Prev
+        </button>
+        <span className="px-2 font-mono text-[.62rem] uppercase tracking-widest text-text-secondary">
+          {page} / {pages}
+        </span>
+        <button
+          onClick={() => onPage(page + 1)}
+          disabled={page === pages}
+          className="flex items-center gap-1 rounded-sm border border-border-default px-2 py-1 font-mono text-[.62rem] uppercase tracking-widest text-text-muted transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30"
+        >
+          Next <LuChevronRight className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Positions ──────────────────────────────────────────────────────────────
 
 function PositionsTable({ cid, broker, search }: { cid: string; broker: BrokerType; search: string }) {
   const api = useBrokerApi(broker);
+  const [page, setPage] = useState(1);
 
   const { data: positions = [], isLoading } = useQuery({
     queryKey: positionsKey(broker, cid),
@@ -470,38 +537,45 @@ function PositionsTable({ cid, broker, search }: { cid: string; broker: BrokerTy
     [positions, search],
   );
 
+  useEffect(() => { setPage(1); }, [search]);
+
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   if (isLoading) return <TableLoader />;
   if (rows.length === 0) return <TableEmpty label={search ? "No matching positions" : "No open positions"} />;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="border-b border-border-subtle">
-            {["Symbol", "Qty", "Avg Cost", "Mark Price", "Unrealized P&L"].map((h) => (
-              <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((pos) => {
-            const pnl = parseFloat(pos.unrealized_pnl);
-            return (
-              <tr key={pos.symbol} className="border-b border-border-subtle last:border-0">
-                <td className="py-2.5 pr-4 font-display font-bold uppercase tracking-wider text-text-primary">{pos.symbol}</td>
-                <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">{pos.qty}</td>
-                <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">${parseFloat(pos.avg_cost).toFixed(2)}</td>
-                <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">${parseFloat(pos.mark_price).toFixed(2)}</td>
-                <td className={`py-2.5 font-mono text-sm font-bold ${pnl >= 0 ? "text-bull" : "text-bear"}`}>
-                  {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-border-subtle">
+              {["Symbol", "Qty", "Avg Cost", "Mark Price", "Unrealized P&L"].map((h) => (
+                <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((pos) => {
+              const pnl = parseFloat(pos.unrealized_pnl);
+              return (
+                <tr key={pos.symbol} className="border-b border-border-subtle last:border-0">
+                  <td className="py-2.5 pr-4 font-display font-bold uppercase tracking-wider text-text-primary">{pos.symbol}</td>
+                  <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">{pos.qty}</td>
+                  <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">${parseFloat(pos.avg_cost).toFixed(2)}</td>
+                  <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">${parseFloat(pos.mark_price).toFixed(2)}</td>
+                  <td className={`py-2.5 font-mono text-sm font-bold ${pnl >= 0 ? "text-bull" : "text-bear"}`}>
+                    {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page} total={rows.length} onPage={setPage} />
     </div>
   );
 }
@@ -523,6 +597,7 @@ function OrdersTable({
 }) {
   const api = useBrokerApi(broker);
   const qc = useQueryClient();
+  const [page, setPage] = useState(1);
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ordersKey(broker, cid, status),
@@ -558,33 +633,40 @@ function OrdersTable({
     [orders, search, side],
   );
 
+  useEffect(() => { setPage(1); }, [search, side, status]);
+
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   if (isLoading) return <TableLoader />;
   if (rows.length === 0) return <TableEmpty label={`No ${status} orders`} />;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="border-b border-border-subtle">
-            {["Symbol", "Side", "Type", "Qty", "Limit", "Stop", "Status", ""].map((h) => (
-              <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
-                {h}
-              </th>
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-border-subtle">
+              {["Symbol", "Side", "Type", "Qty", "Limit", "Stop", "Status", ""].map((h) => (
+                <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.map((order) => (
+              <OrderRow
+                key={order.broker_order_id}
+                order={order}
+                onCancel={() => cancelMut.mutate(order.broker_order_id)}
+                cancelling={cancelMut.isPending && cancelMut.variables === order.broker_order_id}
+                statusColor={statusColor}
+              />
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((order) => (
-            <OrderRow
-              key={order.broker_order_id}
-              order={order}
-              onCancel={() => cancelMut.mutate(order.broker_order_id)}
-              cancelling={cancelMut.isPending && cancelMut.variables === order.broker_order_id}
-              statusColor={statusColor}
-            />
-          ))}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page} total={rows.length} onPage={setPage} />
     </div>
   );
 }
@@ -654,6 +736,7 @@ function FillsTable({
   side: "all" | OrderSide;
 }) {
   const api = useBrokerApi(broker);
+  const [page, setPage] = useState(1);
 
   const { data: fills = [], isLoading } = useQuery({
     queryKey: fillsKey(broker, cid),
@@ -671,44 +754,51 @@ function FillsTable({
     [fills, search, side],
   );
 
+  useEffect(() => { setPage(1); }, [search, side]);
+
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   if (isLoading) return <TableLoader />;
   if (rows.length === 0) return <TableEmpty label={search || side !== "all" ? "No matching fills" : "No fills yet"} />;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left">
-        <thead>
-          <tr className="border-b border-border-subtle">
-            {["Symbol", "Side", "Qty", "Price", "Fee", "Filled At"].map((h) => (
-              <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((fill) => (
-            <tr key={fill.broker_fill_id} className="border-b border-border-subtle last:border-0">
-              <td className="py-2.5 pr-4 font-display text-sm font-bold uppercase tracking-wider text-text-primary">
-                {fill.symbol}
-              </td>
-              <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${normSide(fill.side) === "buy" ? "text-bull" : "text-bear"}`}>
-                {normEnum(fill.side)}
-              </td>
-              <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">{fill.qty}</td>
-              <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
-                ${parseFloat(fill.price).toFixed(2)}
-              </td>
-              <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
-                {fill.fee ? `$${parseFloat(fill.fee).toFixed(4)}` : "—"}
-              </td>
-              <td className="py-2.5 font-mono text-[.62rem] text-text-disabled">
-                {new Date(fill.filled_at).toLocaleString()}
-              </td>
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-border-subtle">
+              {["Symbol", "Side", "Qty", "Price", "Fee", "Filled At"].map((h) => (
+                <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
+                  {h}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {pageRows.map((fill) => (
+              <tr key={fill.broker_fill_id} className="border-b border-border-subtle last:border-0">
+                <td className="py-2.5 pr-4 font-display text-sm font-bold uppercase tracking-wider text-text-primary">
+                  {fill.symbol}
+                </td>
+                <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${normSide(fill.side) === "buy" ? "text-bull" : "text-bear"}`}>
+                  {normEnum(fill.side)}
+                </td>
+                <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">{fill.qty}</td>
+                <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
+                  ${parseFloat(fill.price).toFixed(2)}
+                </td>
+                <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
+                  {fill.fee ? `$${parseFloat(fill.fee).toFixed(4)}` : "—"}
+                </td>
+                <td className="py-2.5 font-mono text-[.62rem] text-text-disabled">
+                  {new Date(fill.filled_at).toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={page} total={rows.length} onPage={setPage} />
     </div>
   );
 }

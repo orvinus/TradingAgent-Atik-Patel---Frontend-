@@ -7,10 +7,10 @@ import { copyValidatorApi } from "@/api/endpoints/copyValidator";
 import { copyTradingApi } from "@/api/endpoints/copyTrading";
 import { discordCopierApi } from "@/api/endpoints/discordCopyTrading";
 import type {
+  NormalizedValidatorConfig,
   Platform,
   ValidateBody,
   ValidateResult,
-  ValidatorConfigBody,
 } from "@/types/copyValidator";
 import { ORDER_TYPE_OPTIONS } from "./fieldMeta";
 
@@ -38,7 +38,7 @@ function signalLabel(s: Record<string, unknown>): string {
   return `${side} ${sym}${entry != null ? ` @ ${entry}` : ""}`.trim();
 }
 
-export default function PreviewPanel({ draftConfig }: { draftConfig: Required<ValidatorConfigBody> }) {
+export default function PreviewPanel({ draftConfig }: { draftConfig: NormalizedValidatorConfig }) {
   const [mode, setMode] = useState<"inbox" | "custom">("inbox");
   const [platform, setPlatform] = useState<Platform>("telegram");
   const [signalId, setSignalId] = useState<string>("");
@@ -78,7 +78,13 @@ export default function PreviewPanel({ draftConfig }: { draftConfig: Required<Va
   });
 
   const buildBody = (): ValidateBody | null => {
-    const base: ValidateBody = useDraft ? { config: draftConfig } : {};
+    const configBody: import("@/types/copyValidator").ValidatorConfigBody = {
+      executionMode: draftConfig.executionMode,
+      onViolation: draftConfig.onViolation,
+      fields: draftConfig.fields,
+      ...(draftConfig.profiles != null ? { profiles: draftConfig.profiles } : {}),
+    };
+    const base: ValidateBody = useDraft ? { config: configBody } : {};
     if (mode === "inbox") {
       if (!signalId) return null;
       return { ...base, platform, signalId };

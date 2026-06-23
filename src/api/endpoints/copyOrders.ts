@@ -3,6 +3,7 @@ import { apiClient } from "@/api/client";
 import type {
   CopyOrder,
   CopyOrderStatus,
+  CreateFromSignalBody,
   OrderBroker,
   OrderEdits,
   OrderSettings,
@@ -26,12 +27,7 @@ export const copyOrdersApi = {
   },
 
   updateSettings: async (body: Partial<OrderSettings>): Promise<OrderSettings> => {
-    const { broker, brokerConnectionId, orderExecutionMode } = body;
-    const payload: Partial<OrderSettings> = {};
-    if (broker !== undefined) payload.broker = broker;
-    if (brokerConnectionId !== undefined) payload.brokerConnectionId = brokerConnectionId;
-    if (orderExecutionMode !== undefined) payload.orderExecutionMode = orderExecutionMode;
-    const { data } = await apiClient.put(`${BASE}/settings`, payload);
+    const { data } = await apiClient.put(`${BASE}/settings`, body);
     const d = unwrap<{ settings?: OrderSettings } & OrderSettings>(data);
     return (d?.settings ?? d ?? body) as OrderSettings;
   },
@@ -76,6 +72,12 @@ export const copyOrdersApi = {
 
   cancel: async (id: string): Promise<CopyOrder> => {
     const { data } = await apiClient.post(`${BASE}/${encodeURIComponent(id)}/cancel`, {});
+    const d = unwrap<{ order?: CopyOrder } & CopyOrder>(data);
+    return (d?.order ?? d) as CopyOrder;
+  },
+
+  createFromSignal: async (body: CreateFromSignalBody): Promise<CopyOrder> => {
+    const { data } = await apiClient.post(`${BASE}/from-signal`, body);
     const d = unwrap<{ order?: CopyOrder } & CopyOrder>(data);
     return (d?.order ?? d) as CopyOrder;
   },

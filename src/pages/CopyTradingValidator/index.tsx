@@ -8,8 +8,10 @@ import { copyValidatorApi } from "@/api/endpoints/copyValidator";
 import { qk } from "@/api/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { toast } from "@/components/ui/Toast";
-import type { ValidatorConfigBody } from "@/types/copyValidator";
+import type { NormalizedValidatorConfig, ProfileConfig, ValidatorConfigBody, ValidatorProfile } from "@/types/copyValidator";
+import { ProfileSettingsTabs } from "@/components/copy-trading/ProfileSettingsTabs";
 import ValidatorForm, { normalizeConfig } from "./ValidatorForm";
+import OptionsValidatorForm, { normalizeOptionsConfig } from "./OptionsValidatorForm";
 import { serializeConfig, validateConfig } from "./serialize";
 import PreviewPanel from "./PreviewPanel";
 import SourceOverrides from "./SourceOverrides";
@@ -22,42 +24,82 @@ function apiErr(err: unknown): string {
 export default function CopyTradingValidator() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<ValidatorProfile>("equity");
 
   const optionsQuery = useQuery({
     queryKey: qk.copyValidatorOptions(),
     queryFn: copyValidatorApi.getOptions,
-    staleTime: 60 * 60 * 1000, // metadata rarely changes
+    staleTime: 60 * 60 * 1000,
   });
 
-  const configQuery = useQuery({
+  // Load equity config (global)
+  const equityConfigQuery = useQuery({
     queryKey: qk.copyValidatorConfig(),
-    queryFn: copyValidatorApi.getConfig,
+    queryFn: () => copyValidatorApi.getConfig(),
   });
 
-  const [config, setConfig] = useState<Required<ValidatorConfigBody>>(normalizeConfig());
+  // Load options profile config
+  const optionsConfigQuery = useQuery({
+    queryKey: qk.copyValidatorConfigProfile("options"),
+    queryFn: () => copyValidatorApi.getConfig("options"),
+  });
 
-  // Populate form state once the stored config loads.
+  const [equityConfig, setEquityConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
+  const [optionsConfig, setOptionsConfig] = useState<Required<ProfileConfig>>(normalizeOptionsConfig());
+
   useEffect(() => {
-    if (configQuery.data) setConfig(normalizeConfig(configQuery.data));
-  }, [configQuery.data]);
+    if (equityConfigQuery.data) {
+      setEquityConfig(normalizeConfig(equityConfigQuery.data));
+      // If profiles.equity exists, also hydrate from it
+      const profileEquity = (equityConfigQuery.data as { profiles?: { equity?: ProfileConfig } }).profiles?.equity;
+      if (profileEquity) setEquityConfig(normalizeConfig({ ...equityConfigQuery.data, ...profileEquity }));
+    }
+  }, [equityConfigQuery.data]);
+
+  useEffect(() => {
+    if (optionsConfigQuery.data) {
+      const profileOptions = (optionsConfigQuery.data as { profiles?: { options?: ProfileConfig }; effectiveConfig?: ProfileConfig }).effectiveConfig
+        ?? (optionsConfigQuery.data as { profiles?: { options?: ProfileConfig } }).profiles?.options
+        ?? optionsConfigQuery.data;
+      setOptionsConfig(normalizeOptionsConfig(profileOptions as ProfileConfig));
+    }
+  }, [optionsConfigQuery.data]);
 
   const saveMut = useMutation({
     mutationFn: (body: ValidatorConfigBody) => copyValidatorApi.updateConfig(body),
     onSuccess: (saved) => {
       toast.success("Validation settings saved");
+      qc.invalidateQueries({ queryKey: qk.copyValidatorConfig() });
+      qc.invalidateQueries({ queryKey: qk.copyValidatorConfigProfile("options") });
       qc.setQueryData(qk.copyValidatorConfig(), saved);
     },
     onError: (e) => toast.error(apiErr(e)),
   });
 
   const onSave = () => {
-    const errs = validateConfig(config);
-    if (errs.length) {
-      toast.error(errs[0] ?? "Please fix the highlighted rules.");
-      return;
+    if (activeTab === "equity") {
+      const errs = validateConfig(equityConfig);
+      if (errs.length) { toast.error(errs[0] ?? "Please fix the highlighted rules."); return; }
+      saveMut.mutate({
+        ...serializeConfig(equityConfig),
+        profiles: { equity: serializeConfig(equityConfig) },
+      });
+    } else {
+      saveMut.mutate({
+        profiles: {
+          options: {
+            executionMode: optionsConfig.executionMode,
+            onViolation: optionsConfig.onViolation,
+            fields: optionsConfig.fields,
+          },
+        },
+      });
     }
-    saveMut.mutate(serializeConfig(config));
   };
+
+  const isLoading = activeTab === "equity" ? equityConfigQuery.isLoading : optionsConfigQuery.isLoading;
+  const isError = activeTab === "equity" ? equityConfigQuery.isError : optionsConfigQuery.isError;
+  const loadError = activeTab === "equity" ? equityConfigQuery.error : optionsConfigQuery.error;
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -72,7 +114,7 @@ export default function CopyTradingValidator() {
           Validation &amp; Limits
         </h1>
         <p className="mt-1 font-mono text-[.7rem] text-text-muted">
-          Copy signals exactly, or apply per-field risk limits before they become orders.
+          Apply separate risk rules for equity trades and options contracts.
         </p>
       </div>
 
@@ -83,7 +125,7 @@ export default function CopyTradingValidator() {
           <div>
             <p className="font-mono text-[.68rem] font-bold text-text-primary">Missing Values in Copy Trading</p>
             <p className="font-mono text-[.62rem] text-text-muted">
-              Set defaults for when SL, TP, or lot size is absent from a parsed signal.
+              Set defaults for when SL, TP, or size is absent from a parsed signal.
             </p>
           </div>
         </div>
@@ -95,35 +137,40 @@ export default function CopyTradingValidator() {
         </button>
       </div>
 
-      {/* Settings */}
-      <div className="rounded-lg border border-border-subtle bg-bg-surface p-5 shadow-card">
-        {configQuery.isLoading ? (
-          <div className="flex items-center gap-2 font-mono text-[.65rem] text-text-muted">
-            <LuLoader className="h-3.5 w-3.5 animate-spin" /> Loading settings…
-          </div>
-        ) : configQuery.isError ? (
-          <div className="rounded-sm border border-bear/30 bg-bear/10 px-3 py-2 font-mono text-[.65rem] text-bear">
-            Couldn't load validator settings. {apiErr(configQuery.error)}
-          </div>
-        ) : (
-          <>
-            <ValidatorForm config={config} onChange={setConfig} options={optionsQuery.data} />
-            <div className="mt-6 flex justify-end">
+      {/* Settings card with tabs */}
+      <div className="rounded-lg border border-border-subtle bg-bg-surface shadow-card">
+        <div className="px-5 pt-5">
+          <ProfileSettingsTabs activeTab={activeTab} onTabChange={setActiveTab}>
+            {isLoading ? (
+              <div className="flex items-center gap-2 font-mono text-[.65rem] text-text-muted pb-5">
+                <LuLoader className="h-3.5 w-3.5 animate-spin" /> Loading settings…
+              </div>
+            ) : isError ? (
+              <div className="rounded-sm border border-bear/30 bg-bear/10 px-3 py-2 font-mono text-[.65rem] text-bear mb-5">
+                Couldn't load validator settings. {apiErr(loadError)}
+              </div>
+            ) : activeTab === "equity" ? (
+              <ValidatorForm config={equityConfig} onChange={setEquityConfig} options={optionsQuery.data} />
+            ) : (
+              <OptionsValidatorForm config={optionsConfig} onChange={setOptionsConfig} />
+            )}
+
+            <div className="mt-6 mb-5 flex justify-end">
               <button
                 onClick={onSave}
-                disabled={saveMut.isPending}
+                disabled={saveMut.isPending || isLoading}
                 className="inline-flex items-center gap-2 rounded-sm bg-accent px-5 py-2.5 font-mono text-[.68rem] font-bold uppercase tracking-widest text-bg-base transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saveMut.isPending && <LuLoader className="h-3.5 w-3.5 animate-spin" />}
-                Save settings
+                Save {activeTab === "equity" ? "Equity" : "Options"} settings
               </button>
             </div>
-          </>
-        )}
+          </ProfileSettingsTabs>
+        </div>
       </div>
 
       {/* Preview */}
-      <PreviewPanel draftConfig={config} />
+      <PreviewPanel draftConfig={equityConfig} />
 
       {/* Per-source overrides */}
       <SourceOverrides options={optionsQuery.data} />

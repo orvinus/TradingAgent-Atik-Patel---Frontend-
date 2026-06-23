@@ -206,9 +206,12 @@ export const qk = {
   // ── Copy Trading Validator (risk / limits) ─────────────────────────────
   copyValidatorOptions:     ()                           => ["copy-validator", "options"]          as const,
   copyValidatorConfig:      ()                           => ["copy-validator", "config"]           as const,
+  copyValidatorConfigProfile: (profile: string)         => ["copy-validator", "config", profile]  as const,
   copyValidatorSources:     ()                           => ["copy-validator", "sources"]          as const,
   copyValidatorSource:      (platform: string, sourceId: string) =>
                                                             ["copy-validator", "sources", platform, sourceId] as const,
+  copyValidatorSourceProfile: (platform: string, sourceId: string, profile: string) =>
+                                                            ["copy-validator", "sources", platform, sourceId, profile] as const,
 
   // ── Copy Trading Missing Fields ────────────────────────────────────────────
   missingFieldsOptions:     ()                           => ["missing-fields", "options"]          as const,

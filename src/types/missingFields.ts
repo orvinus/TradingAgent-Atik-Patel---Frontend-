@@ -3,6 +3,8 @@
 
 export type WhenMissing = "reject" | "use_default" | "allow_empty";
 
+export type EntryWhenMissing = "reject" | "use_market" | "use_default";
+
 export type Completeness = "complete" | "partial" | "entry_only" | "invalid";
 
 // ── Config shapes (API) ───────────────────────────────────────────────────────
@@ -30,7 +32,13 @@ export interface LotSizeFieldConfig {
   defaultLots?: number;
 }
 
+export interface EntryFieldConfig {
+  whenMissing: EntryWhenMissing;
+  defaultLimitPrice?: number;
+}
+
 export interface MissingFieldsConfig {
+  entry?: EntryFieldConfig;
   sl: SlFieldConfig;
   tp: TpFieldConfig;
   lotSize: LotSizeFieldConfig;
@@ -79,7 +87,9 @@ export interface MissingFieldsPreviewResult {
   adjusted?: {
     symbol?: string;
     side?: string;
+    order_type?: string | null;
     limit_price?: number | null;
+    entry_display?: string | null;
     sl_price?: number | null;
     tp_price?: number | null;
     lot_size?: number | null;

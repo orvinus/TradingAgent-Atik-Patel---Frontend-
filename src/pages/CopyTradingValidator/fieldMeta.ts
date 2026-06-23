@@ -5,7 +5,7 @@
 // UI is fully functional even before (or without) the options call.
 import type { ValidatorFieldKey, OrderTypeValue } from "@/types/copyValidator";
 
-export type FieldKind = "pct" | "lotSize" | "orderType" | "mode";
+export type FieldKind = "pct" | "lotSize" | "orderType" | "mode" | "trailingStop";
 
 export interface FieldDef {
   key: ValidatorFieldKey;
@@ -41,6 +41,12 @@ export const FIELD_DEFS: FieldDef[] = [
     tooltip: "Cap or fix the position size regardless of the signal's suggestion.",
   },
   {
+    key: "trailingStop",
+    label: "Trailing stop",
+    kind: "trailingStop",
+    tooltip: "Set a trailing stop — either a % trail or a fixed $ amount below the price.",
+  },
+  {
     key: "orderType",
     label: "Order type",
     kind: "orderType",
@@ -67,4 +73,5 @@ export const TOOLTIPS = {
   maxLots: "Cap position size; signals suggesting more lots will be rejected or clamped.",
   reject: "Signal will not be traded if it breaks a rule.",
   clamp: "SL / TP / lots adjusted to the nearest allowed value when possible.",
+  trailingStop: "Trailing stop follows price by a fixed % or $ amount. Only supported for equity.",
 };

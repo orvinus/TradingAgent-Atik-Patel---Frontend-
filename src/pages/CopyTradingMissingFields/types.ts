@@ -7,10 +7,19 @@ import type {
   SlFieldConfig,
   TpFieldConfig,
   LotSizeFieldConfig,
+  EntryFieldConfig,
   WhenMissing,
+  EntryWhenMissing,
 } from "@/types/missingFields";
 
+export type { EntryWhenMissing };
+
 export type PriceMode = "pct" | "fixed";
+
+export interface EntryFormState {
+  whenMissing: EntryWhenMissing;
+  defaultLimitPrice: string;
+}
 
 export interface SlFormState {
   whenMissing: WhenMissing;
@@ -39,6 +48,7 @@ export interface LotFormState {
 }
 
 export interface MissingFieldsFormState {
+  entry: EntryFormState;
   sl: SlFormState;
   tp: TpFormState;
   lotSize: LotFormState;
@@ -47,6 +57,7 @@ export interface MissingFieldsFormState {
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 export const DEFAULT_FORM_STATE: MissingFieldsFormState = {
+  entry: { whenMissing: "use_market", defaultLimitPrice: "" },
   sl: { whenMissing: "reject", priceMode: "pct", pct: "", fixed: "" },
   tp: { whenMissing: "reject", priceMode: "pct", pct: "", fixed: "", multiTp: false, tpLevels: [{ pctFromEntry: "", exit_pct: "" }] },
   lotSize: { whenMissing: "reject", lots: "" },
@@ -55,11 +66,16 @@ export const DEFAULT_FORM_STATE: MissingFieldsFormState = {
 // ── Deserialize API → form state ──────────────────────────────────────────────
 
 export function deserializeConfig(cfg: Partial<MissingFieldsConfig>): MissingFieldsFormState {
+  const entry = cfg.entry ?? ({ whenMissing: "use_market" } as EntryFieldConfig);
   const sl = cfg.sl ?? ({ whenMissing: "reject" } as SlFieldConfig);
   const tp = cfg.tp ?? ({ whenMissing: "reject" } as TpFieldConfig);
   const lot = cfg.lotSize ?? ({ whenMissing: "reject" } as LotSizeFieldConfig);
 
   return {
+    entry: {
+      whenMissing: entry.whenMissing,
+      defaultLimitPrice: entry.defaultLimitPrice != null ? String(entry.defaultLimitPrice) : "",
+    },
     sl: {
       whenMissing: sl.whenMissing,
       priceMode: sl.defaultPrice != null ? "fixed" : "pct",
@@ -99,6 +115,12 @@ const requireNum = (s: string): number => {
 };
 
 export function serializeConfig(form: MissingFieldsFormState): MissingFieldsConfig {
+  const entry: EntryFieldConfig = { whenMissing: form.entry.whenMissing };
+  if (form.entry.whenMissing === "use_default") {
+    const price = n(form.entry.defaultLimitPrice);
+    if (price !== undefined) entry.defaultLimitPrice = price;
+  }
+
   const sl: SlFieldConfig = { whenMissing: form.sl.whenMissing };
   if (form.sl.whenMissing === "use_default") {
     const pct = n(form.sl.pct);
@@ -134,7 +156,7 @@ export function serializeConfig(form: MissingFieldsFormState): MissingFieldsConf
     if (lots !== undefined) lotSize.defaultLots = lots;
   }
 
-  return { sl, tp, lotSize };
+  return { entry, sl, tp, lotSize };
 }
 
 // ── Client-side validation ────────────────────────────────────────────────────
@@ -142,6 +164,12 @@ export function serializeConfig(form: MissingFieldsFormState): MissingFieldsConf
 export function validateForm(form: MissingFieldsFormState): string[] {
   const errors: string[] = [];
   const num = (s: string) => parseFloat(s);
+
+  if (form.entry.whenMissing === "use_default") {
+    const v = num(form.entry.defaultLimitPrice);
+    if (!form.entry.defaultLimitPrice || isNaN(v) || v <= 0)
+      errors.push("Entry default: limit price must be a positive number.");
+  }
 
   if (form.sl.whenMissing === "use_default") {
     if (form.sl.priceMode === "pct") {
