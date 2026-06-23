@@ -1,6 +1,7 @@
 // src/pages/CopyTradingValidator/serialize.ts
 import type {
   LotSizeRule,
+  NormalizedValidatorConfig,
   OrderTypeRule,
   PctFieldRule,
   ValidatorConfigBody,
@@ -13,7 +14,7 @@ const defKind = new Map(FIELD_DEFS.map((d) => [d.key, d.kind] as const));
 
 // Produce a clean payload for PUT /config. Drops undefined inputs and, when in
 // full-auto mode, omits the fields block entirely (backend ignores it anyway).
-export function serializeConfig(c: Required<ValidatorConfigBody>): ValidatorConfigBody {
+export function serializeConfig(c: NormalizedValidatorConfig): ValidatorConfigBody {
   if (c.executionMode === "auto") {
     return { executionMode: "auto", onViolation: c.onViolation };
   }
@@ -53,7 +54,7 @@ export function serializeConfig(c: Required<ValidatorConfigBody>): ValidatorConf
 }
 
 // Validate the form before save. Returns a list of human-readable errors.
-export function validateConfig(c: Required<ValidatorConfigBody>): string[] {
+export function validateConfig(c: NormalizedValidatorConfig): string[] {
   const errors: string[] = [];
   if (c.executionMode !== "manual") return errors;
 

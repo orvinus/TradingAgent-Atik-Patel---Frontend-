@@ -9,6 +9,12 @@ export type FieldMode = "auto" | "manual";
 export type OnViolation = "reject" | "clamp";
 export type OrderTypeValue = "market" | "limit" | "stop" | "stop_limit";
 
+// ── Instrument / asset types (NEW) ─────────────────────────────────────────
+export type InstrumentProfile = "equity" | "options" | "crypto" | "unsupported";
+export type SizeUnit = "shares" | "contracts" | "units";
+export type PriceBasis = "premium" | "spot" | "underlying" | null;
+export type ValidatorProfile = "equity" | "options";
+
 export type Platform = "telegram" | "discord";
 
 // ── Per-field rules ───────────────────────────────────────────────────────────
@@ -33,12 +39,27 @@ export interface SimpleFieldRule {
   mode: FieldMode;
 }
 
+export interface ContractSizeRule {
+  mode: FieldMode;
+  maxContracts?: number;
+  fixedContracts?: number;
+  maxPremium?: number;
+}
+
+export interface TrailingStopRule {
+  mode: "auto" | "manual" | "off";
+  trailPct?: number;
+  trailAmount?: number;
+}
+
 export interface ValidatorFields {
   entry?: SimpleFieldRule;
   sl?: PctFieldRule;
   tp?: PctFieldRule;
   tpLevels?: PctFieldRule;
   lotSize?: LotSizeRule;
+  contractSize?: ContractSizeRule;
+  trailingStop?: TrailingStopRule;
   orderType?: OrderTypeRule;
   side?: SimpleFieldRule;
   symbol?: SimpleFieldRule;
@@ -47,15 +68,58 @@ export interface ValidatorFields {
 // Keys of ValidatorFields, used to drive the rules table generically.
 export type ValidatorFieldKey = keyof ValidatorFields;
 
+// ── Missing field rules for options (inside profiles.options.missingFields) ──
+export interface MissingContractRule {
+  whenMissing: "reject" | "use_default" | "allow_empty";
+  defaultContracts?: number;
+}
+
+export interface ProfileMissingFields {
+  sl?: { whenMissing: "reject" | "use_default" | "allow_empty"; defaultPctFromEntry?: number };
+  tp?: { whenMissing: "reject" | "use_default" | "allow_empty"; defaultPctFromEntry?: number };
+  contractSize?: MissingContractRule;
+}
+
+// ── Profile-specific config ──────────────────────────────────────────────────
+export interface ProfileConfig {
+  executionMode?: ExecutionMode;
+  onViolation?: OnViolation;
+  fields?: ValidatorFields;
+  missingFields?: ProfileMissingFields;
+}
+
 // ── Config (read + write share this shape) ────────────────────────────────────
 export interface ValidatorConfigBody {
   executionMode?: ExecutionMode;
   onViolation?: OnViolation;
   fields?: ValidatorFields;
+  profiles?: {
+    equity?: ProfileConfig;
+    options?: ProfileConfig;
+  };
 }
 
 // The config as returned by GET /config (same shape, fields generally present).
 export type ValidatorConfig = ValidatorConfigBody;
+
+// Normalized form state — all mandatory fields filled, profiles optional.
+export interface NormalizedValidatorConfig {
+  executionMode: ExecutionMode;
+  onViolation: OnViolation;
+  fields: ValidatorFields;
+  profiles?: ValidatorConfigBody["profiles"];
+}
+
+// Extended GET /config?profile=... response
+export interface ValidatorConfigResponse {
+  config: ValidatorConfig;
+  profile?: ValidatorProfile;
+  effectiveConfig?: ProfileConfig;
+  profiles?: {
+    equity?: ProfileConfig;
+    options?: ProfileConfig;
+  };
+}
 
 // ── Validate result ───────────────────────────────────────────────────────────
 export interface Violation {
@@ -72,17 +136,29 @@ export interface ValidateResult {
   valid: boolean;
   executionMode: ExecutionMode;
   onViolation: OnViolation;
+  instrumentProfile?: InstrumentProfile;
   original: Record<string, unknown>;
   adjusted: Record<string, unknown>;
   violations: Violation[];
   summary?: string;
+  preSubmitChecks?: PreSubmitCheck[];
+  missingFields?: {
+    applied: string[];
+    rejected: string[];
+    present: Record<string, boolean>;
+    completeness: "complete" | "partial" | "empty";
+  };
 }
 
 // Body for POST /validate — either reference an existing signal or pass a raw one.
 export interface ValidateBody {
   signalId?: string;
   platform?: Platform;
+  sourceId?: string;
   signal?: Record<string, unknown>;
+  lotSize?: number;
+  contractCount?: number;
+  profile?: ValidatorProfile;
   // Optional: preview against an unsaved config instead of the stored one.
   config?: ValidatorConfigBody;
 }
@@ -114,15 +190,51 @@ export interface SourceConfigSummary {
   config?: ValidatorConfigBody;
 }
 
+// Detailed per-source GET response (GET /config/sources/:platform/:sourceId?profile=equity|options)
+export interface SourceConfigDetailResponse {
+  config: ValidatorConfig | null;
+  inheritsFromGlobal: boolean;
+  profile: ValidatorProfile;
+  effectiveConfig: ProfileConfig;
+  globalEffectiveConfig: ProfileConfig;
+  sourceOverride?: {
+    profiles?: {
+      equity?: ProfileConfig;
+      options?: ProfileConfig;
+    };
+    fields?: ValidatorFields | null;
+    missingFields?: unknown;
+  };
+  profiles?: {
+    equity?: ProfileConfig;
+    options?: ProfileConfig;
+  };
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Order execution
 // ────────────────────────────────────────────────────────────────────────────
 export type OrderExecutionMode = "auto" | "manual_confirm";
 
+export type SizingMode = "fixed_qty" | "notional_usd" | "pct_equity";
+
+export interface SizingConfig {
+  equitySizingMode?: SizingMode | undefined;
+  equityNotionalUsd?: number | undefined;
+  equityPctOfEquity?: number | undefined;
+  optionsSizingMode?: SizingMode | undefined;
+  optionsNotionalUsd?: number | undefined;
+  optionsPctOfEquity?: number | undefined;
+}
+
 export interface OrderSettings {
   broker: string;
   brokerConnectionId: string | null;
   orderExecutionMode: OrderExecutionMode;
+  isActive?: boolean;
+  metadata?: {
+    sizingConfig?: SizingConfig;
+  };
 }
 
 // Connection item inside broker.connections[] from GET /copy-trading/orders/brokers.
@@ -132,6 +244,8 @@ export interface OrderBrokerConnection {
   environment?: string;
   status?: string;
   key_fingerprint?: string;
+  account_id?: string;
+  optionsEnabled?: boolean | null;
 }
 
 // Broker item from GET /copy-trading/orders/brokers.
@@ -160,10 +274,31 @@ export interface TpLevel {
   move_sl_to: string | null;
 }
 
+export interface PreSubmitCheck {
+  name: "options_enabled" | "market_hours" | "price_sanity" | "tradability" | "buying_power" | string;
+  ok: boolean;
+  code?: string;
+  message?: string;
+  skipped?: boolean;
+  marketMid?: number;
+  deviationPct?: number;
+  required?: number;
+  buyingPower?: number;
+}
+
 export interface OrderPreview {
+  instrumentProfile?: InstrumentProfile | null;
+  size_unit?: SizeUnit | null;
   qty: number | null;
   side: "buy" | "sell";
   symbol: string;
+  underlying_symbol?: string | null;
+  contract_symbol?: string | null;
+  option_type?: "call" | "put" | null;
+  strike?: number | null;
+  expiry?: string | null;
+  price_basis?: PriceBasis;
+  multiplier?: number | null;
   summary: string | null;
   lot_size?: number | null;
   raw_text?: string | null;
@@ -171,9 +306,11 @@ export interface OrderPreview {
   tp_price: number | null;
   tp_levels: TpLevel[] | null;
   order_type: string | null;
+  entry_display?: string | null;
   asset_class?: string | null;
   limit_price: number | null;
   time_in_force?: string | null;
+  trailing_stop?: { trailPct?: number; trailAmount?: number } | null;
 }
 
 export interface UserEditedOrder {
@@ -195,6 +332,7 @@ export interface CopyOrder {
   orderPreview?: OrderPreview | null;
   userEditedOrder?: UserEditedOrder | null;
   brokerOrderId?: string | null;
+  clientOrderId?: string | null;
   errorCode?: string | null;
   errorMessage?: string | null;
   confirmedAt?: string | null;
@@ -206,15 +344,29 @@ export interface CopyOrder {
 // Editable subset for PATCH /orders/:id and confirm userEdits.
 export interface OrderEdits {
   qty?: number;
-  limit_price?: number;
+  order_type?: string;
+  limit_price?: number | null;
   sl_price?: number;
   tp_price?: number;
   tp_levels?: Array<{ level: number; exit_pct: number; move_sl_to: string | null }>;
   symbol?: string;
+  time_in_force?: string;
 }
 
 // 502 broker error envelope shape.
 export interface BrokerError {
   message: string;
   code?: string;
+  preSubmitChecks?: PreSubmitCheck[];
+}
+
+// POST /from-signal request body
+export interface CreateFromSignalBody {
+  platform: "telegram" | "discord";
+  signalId: string;
+  lotSize?: number;
+  qty?: number;
+  contractCount?: number;
+  forceExecute?: boolean;
+  userEdits?: Partial<OrderEdits>;
 }

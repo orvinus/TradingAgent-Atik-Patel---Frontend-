@@ -7,10 +7,12 @@ import type {
   ExecutionMode,
   FieldMode,
   LotSizeRule,
+  NormalizedValidatorConfig,
   OnViolation,
   OrderTypeRule,
   OrderTypeValue,
   PctFieldRule,
+  TrailingStopRule,
   ValidatorConfigBody,
   ValidatorFieldKey,
   ValidatorFields,
@@ -26,6 +28,7 @@ export function buildDefaultFields(): ValidatorFields {
     tp: { mode: "auto" },
     tpLevels: { mode: "auto" },
     lotSize: { mode: "auto" },
+    trailingStop: { mode: "off" },
     orderType: { mode: "auto" },
     entry: { mode: "auto" },
     side: { mode: "auto" },
@@ -33,12 +36,14 @@ export function buildDefaultFields(): ValidatorFields {
   };
 }
 
-export function normalizeConfig(c?: ValidatorConfigBody): Required<ValidatorConfigBody> {
-  return {
+export function normalizeConfig(c?: ValidatorConfigBody): NormalizedValidatorConfig {
+  const result: NormalizedValidatorConfig = {
     executionMode: c?.executionMode ?? "auto",
     onViolation: c?.onViolation ?? "reject",
     fields: { ...buildDefaultFields(), ...(c?.fields ?? {}) },
   };
+  if (c?.profiles != null) result.profiles = c.profiles;
+  return result;
 }
 
 const numOrUndef = (s: string): number | undefined => {
@@ -58,8 +63,8 @@ export default function ValidatorForm({
   onChange,
   options,
 }: {
-  config: Required<ValidatorConfigBody>;
-  onChange: (next: Required<ValidatorConfigBody>) => void;
+  config: NormalizedValidatorConfig;
+  onChange: (next: NormalizedValidatorConfig) => void;
   options?: ValidatorOptions | undefined;
 }) {
   const manual = config.executionMode === "manual";
@@ -316,6 +321,56 @@ function RuleInputs({
           </option>
         ))}
       </select>
+    );
+  }
+
+  if (def.kind === "trailingStop") {
+    const r = (rule as TrailingStopRule) ?? { mode: "off" };
+    return (
+      <div className="flex flex-col gap-2">
+        <select
+          value={r.mode}
+          disabled={disabled}
+          onChange={(e) => onChange({ ...r, mode: e.target.value as TrailingStopRule["mode"] })}
+          className={selectCls}
+        >
+          <option value="off">Off</option>
+          <option value="auto">Auto (use signal)</option>
+          <option value="manual">Manual</option>
+        </select>
+        {r.mode === "manual" && (
+          <div className="flex flex-col gap-1.5 pl-1">
+            <label className="flex items-center gap-2">
+              <span className="w-36 font-mono text-[.62rem] text-text-muted">Trail % from price</span>
+              <input
+                type="number"
+                min={0.01}
+                step={0.1}
+                value={r.trailPct ?? ""}
+                disabled={disabled}
+                placeholder="e.g. 5"
+                onChange={(e) => { const v = numOrUndef(e.target.value); const next: TrailingStopRule = { mode: r.mode }; if (v != null) next.trailPct = v; onChange(next); }}
+                className={inputCls}
+              />
+              <span className="font-mono text-[.6rem] text-text-muted">%</span>
+            </label>
+            <span className="font-mono text-[.58rem] text-text-disabled pl-36">— OR —</span>
+            <label className="flex items-center gap-2">
+              <span className="w-36 font-mono text-[.62rem] text-text-muted">Trail $ amount</span>
+              <input
+                type="number"
+                min={0.01}
+                step={0.01}
+                value={r.trailAmount ?? ""}
+                disabled={disabled}
+                placeholder="e.g. 2.50"
+                onChange={(e) => { const v = numOrUndef(e.target.value); const next: TrailingStopRule = { mode: r.mode }; if (v != null) next.trailAmount = v; onChange(next); }}
+                className={inputCls}
+              />
+            </label>
+          </div>
+        )}
+      </div>
     );
   }
 

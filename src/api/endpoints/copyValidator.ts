@@ -2,12 +2,15 @@
 import { apiClient } from "@/api/client";
 import type {
   Platform,
+  SourceConfigDetailResponse,
   ValidatorConfig,
   ValidatorConfigBody,
+  ValidatorConfigResponse,
   ValidatorOptions,
   ValidateBody,
   ValidateResult,
   SourceConfigSummary,
+  ValidatorProfile,
 } from "@/types/copyValidator";
 
 // Backend wraps payloads in { success, data } like the rest of copy-trading.
@@ -29,10 +32,15 @@ export const copyValidatorApi = {
     return Array.isArray(d) ? { fields: d } : (d as ValidatorOptions);
   },
 
-  getConfig: async (): Promise<ValidatorConfig> => {
-    const { data } = await apiClient.get(`${BASE}/config`);
+  getConfig: async (profile?: ValidatorProfile): Promise<ValidatorConfig> => {
+    const { data } = await apiClient.get(`${BASE}/config`, { params: profile ? { profile } : undefined });
     const d = unwrap<{ config?: ValidatorConfig } & ValidatorConfig>(data);
     return (d?.config ?? d ?? {}) as ValidatorConfig;
+  },
+
+  getConfigWithProfile: async (profile: ValidatorProfile): Promise<ValidatorConfigResponse> => {
+    const { data } = await apiClient.get(`${BASE}/config`, { params: { profile } });
+    return unwrap<ValidatorConfigResponse>(data);
   },
 
   updateConfig: async (body: ValidatorConfigBody): Promise<ValidatorConfig> => {
@@ -57,6 +65,18 @@ export const copyValidatorApi = {
     return (d?.config ?? d ?? {}) as ValidatorConfig;
   },
 
+  getSourceConfigDetail: async (
+    platform: Platform,
+    sourceId: string,
+    profile: ValidatorProfile = "equity",
+  ): Promise<SourceConfigDetailResponse> => {
+    const { data } = await apiClient.get(
+      `${BASE}/config/sources/${platform}/${encodeURIComponent(sourceId)}`,
+      { params: { profile } },
+    );
+    return unwrap<SourceConfigDetailResponse>(data);
+  },
+
   updateSourceConfig: async (
     platform: Platform,
     sourceId: string,
@@ -77,6 +97,7 @@ export const copyValidatorApi = {
   // ── Preview ──────────────────────────────────────────────────────────────
   validate: async (body: ValidateBody): Promise<ValidateResult> => {
     const { data } = await apiClient.post(`${BASE}/validate`, body);
-    return unwrap<ValidateResult>(data);
+    const d = unwrap<{ result?: ValidateResult } & ValidateResult>(data);
+    return (d?.result ?? d) as ValidateResult;
   },
 };
