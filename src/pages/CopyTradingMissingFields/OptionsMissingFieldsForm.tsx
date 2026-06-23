@@ -2,7 +2,7 @@
 // Missing-fields defaults form for options contracts.
 // Uses "contractSize" instead of "lotSize"; SL/TP are premium-based.
 
-import type { WhenMissing } from "@/types/missingFields";
+import type { WhenMissing, EntryWhenMissing } from "@/types/missingFields";
 
 const selectCls =
   "rounded-sm border border-border-default bg-bg-base px-2.5 py-1.5 font-mono text-[.68rem] text-text-primary outline-none focus:border-accent disabled:opacity-40";
@@ -18,6 +18,10 @@ const WHEN_MISSING_LABELS: Record<WhenMissing, string> = {
 // ── Form state ────────────────────────────────────────────────────────────────
 
 export interface OptionsMissingFieldsFormState {
+  entry: {
+    whenMissing: EntryWhenMissing;
+    defaultPremium: string;
+  };
   sl: {
     whenMissing: WhenMissing;
     defaultPctFromEntry: string;
@@ -33,6 +37,7 @@ export interface OptionsMissingFieldsFormState {
 }
 
 export const DEFAULT_OPTIONS_FORM_STATE: OptionsMissingFieldsFormState = {
+  entry: { whenMissing: "use_market", defaultPremium: "" },
   sl: { whenMissing: "reject", defaultPctFromEntry: "" },
   tp: { whenMissing: "allow_empty", defaultPctFromEntry: "" },
   contractSize: { whenMissing: "use_default", defaultContracts: "1" },
@@ -40,12 +45,17 @@ export const DEFAULT_OPTIONS_FORM_STATE: OptionsMissingFieldsFormState = {
 
 export function deserializeOptionsConfig(raw: Record<string, unknown> | null | undefined): OptionsMissingFieldsFormState {
   const mf = raw as {
+    entry?: { whenMissing?: EntryWhenMissing; defaultLimitPrice?: number };
     sl?: { whenMissing?: WhenMissing; defaultPctFromEntry?: number };
     tp?: { whenMissing?: WhenMissing; defaultPctFromEntry?: number };
     contractSize?: { whenMissing?: WhenMissing; defaultContracts?: number };
   } | undefined;
 
   return {
+    entry: {
+      whenMissing: mf?.entry?.whenMissing ?? "use_market",
+      defaultPremium: mf?.entry?.defaultLimitPrice != null ? String(mf.entry.defaultLimitPrice) : "",
+    },
     sl: {
       whenMissing: mf?.sl?.whenMissing ?? "reject",
       defaultPctFromEntry: mf?.sl?.defaultPctFromEntry != null ? String(mf.sl.defaultPctFromEntry) : "",
@@ -65,6 +75,12 @@ export function serializeOptionsConfig(form: OptionsMissingFieldsFormState) {
   const n = (s: string) => { const v = parseFloat(s); return isNaN(v) ? undefined : v; };
   return {
     missingFields: {
+      entry: {
+        whenMissing: form.entry.whenMissing,
+        ...(form.entry.whenMissing === "use_default" && n(form.entry.defaultPremium) != null
+          ? { defaultLimitPrice: n(form.entry.defaultPremium) }
+          : {}),
+      },
       sl: {
         whenMissing: form.sl.whenMissing,
         ...(form.sl.whenMissing === "use_default" && n(form.sl.defaultPctFromEntry) != null
@@ -90,6 +106,12 @@ export function serializeOptionsConfig(form: OptionsMissingFieldsFormState) {
 export function validateOptionsForm(form: OptionsMissingFieldsFormState): string[] {
   const errors: string[] = [];
   const n = (s: string) => parseFloat(s);
+
+  if (form.entry.whenMissing === "use_default") {
+    const v = n(form.entry.defaultPremium);
+    if (!form.entry.defaultPremium || isNaN(v) || v <= 0)
+      errors.push("Entry default: premium must be a positive number.");
+  }
 
   if (form.sl.whenMissing === "use_default") {
     const v = n(form.sl.defaultPctFromEntry);
@@ -129,6 +151,50 @@ export default function OptionsMissingFieldsForm({
       </div>
 
       <div className="flex flex-col divide-y divide-border-subtle">
+        {/* Entry */}
+        <div className="pb-6">
+          <div className="mb-3">
+            <h3 className="font-mono text-[.72rem] font-bold uppercase tracking-[.12em] text-text-primary">
+              Buy / entry price
+            </h3>
+            <p className="mt-0.5 font-mono text-[.6rem] text-text-muted">
+              Applies when the signal has no premium / limit price, or explicitly says &lsquo;market&rsquo;.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="w-28 font-mono text-[.62rem] text-text-muted">When missing:</span>
+            <select
+              value={state.entry.whenMissing}
+              onChange={(e) => onChange({ ...state, entry: { ...state.entry, whenMissing: e.target.value as EntryWhenMissing } })}
+              className={selectCls}
+            >
+              <option value="reject">Reject trade</option>
+              <option value="use_market">Use market order</option>
+              <option value="use_default">Use my default premium ($)</option>
+            </select>
+          </div>
+          {state.entry.whenMissing === "use_market" && (
+            <p className="ml-[7.25rem] mt-2 font-mono text-[.59rem] text-amber-400">
+              Order will buy/sell contracts at market premium. % SL/TP defaults require a reference premium — use fixed-price SL/TP when trading at market.
+            </p>
+          )}
+          {state.entry.whenMissing === "use_default" && (
+            <div className="ml-[7.25rem] mt-2.5 flex items-center gap-2">
+              <label className="font-mono text-[.62rem] text-text-muted">Default premium ($)</label>
+              <input
+                type="number"
+                min={0.01}
+                step={0.01}
+                value={state.entry.defaultPremium}
+                onChange={(e) => onChange({ ...state, entry: { ...state.entry, defaultPremium: e.target.value } })}
+                placeholder="1.50"
+                className={inputCls}
+              />
+              <span className="font-mono text-[.62rem] text-text-muted">per contract</span>
+            </div>
+          )}
+        </div>
+
         {/* SL */}
         <div className="pb-6">
           <div className="mb-3">

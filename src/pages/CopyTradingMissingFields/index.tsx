@@ -169,6 +169,7 @@ export default function CopyTradingMissingFields() {
                     onClick={() =>
                       setEquityForm(
                         deserializeConfig({
+                          entry: { whenMissing: "use_market" },
                           sl: { whenMissing: "use_default", defaultPctFromEntry: 5 },
                           tp: { whenMissing: "use_default", defaultPctFromEntry: 10 },
                           lotSize: { whenMissing: "use_default", defaultLots: 1 },
@@ -177,12 +178,13 @@ export default function CopyTradingMissingFields() {
                     }
                     className="rounded-sm border border-border-default px-2.5 py-1 font-mono text-[.6rem] text-text-secondary hover:border-accent hover:text-accent"
                   >
-                    Safe defaults (5% SL · 10% TP · 1 lot)
+                    Safe defaults (market · 5% SL · 10% TP · 1 lot)
                   </button>
                   <button
                     onClick={() =>
                       setEquityForm(
                         deserializeConfig({
+                          entry: { whenMissing: "reject" },
                           sl: { whenMissing: "reject" },
                           tp: { whenMissing: "reject" },
                           lotSize: { whenMissing: "reject" },
@@ -204,6 +206,7 @@ export default function CopyTradingMissingFields() {
                   <button
                     onClick={() =>
                       setOptionsForm({
+                        entry: { whenMissing: "use_market", defaultPremium: "" },
                         sl: { whenMissing: "use_default", defaultPctFromEntry: "20" },
                         tp: { whenMissing: "allow_empty", defaultPctFromEntry: "" },
                         contractSize: { whenMissing: "use_default", defaultContracts: "1" },
@@ -211,11 +214,12 @@ export default function CopyTradingMissingFields() {
                     }
                     className="rounded-sm border border-border-default px-2.5 py-1 font-mono text-[.6rem] text-text-secondary hover:border-purple-400 hover:text-purple-400"
                   >
-                    Safe defaults (20% SL · allow TP empty · 1 contract)
+                    Safe defaults (market · 20% SL · allow TP empty · 1 contract)
                   </button>
                   <button
                     onClick={() =>
                       setOptionsForm({
+                        entry: { whenMissing: "reject", defaultPremium: "" },
                         sl: { whenMissing: "reject", defaultPctFromEntry: "" },
                         tp: { whenMissing: "reject", defaultPctFromEntry: "" },
                         contractSize: { whenMissing: "reject", defaultContracts: "" },

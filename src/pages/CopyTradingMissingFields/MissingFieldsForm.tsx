@@ -4,10 +4,12 @@ import type { WhenMissing } from "@/types/missingFields";
 import type {
   MissingFieldsFormState,
   PriceMode,
+  EntryFormState,
   SlFormState,
   TpFormState,
   LotFormState,
   TpLevelRow,
+  EntryWhenMissing,
 } from "./types";
 
 const selectCls =
@@ -78,6 +80,61 @@ function PriceModeRadio({
           </span>
         </label>
       ))}
+    </div>
+  );
+}
+
+// ── Entry Section ─────────────────────────────────────────────────────────────
+
+const ENTRY_WHEN_MISSING_LABELS: Record<EntryWhenMissing, string> = {
+  reject: "Reject trade",
+  use_market: "Use market order",
+  use_default: "Use my default limit price",
+};
+
+function EntrySection({ state, onChange }: { state: EntryFormState; onChange: (s: EntryFormState) => void }) {
+  const useDefault = state.whenMissing === "use_default";
+  const useMarket = state.whenMissing === "use_market";
+
+  return (
+    <div className="flex flex-col gap-3">
+      <SectionHeader
+        title="Buy / entry price"
+        hint="Applies when the signal has no limit price OR the signal explicitly says 'market'."
+      />
+      <div className="flex items-center gap-3">
+        <span className="w-28 font-mono text-[.62rem] text-text-muted">When missing:</span>
+        <select
+          value={state.whenMissing}
+          onChange={(e) => onChange({ ...state, whenMissing: e.target.value as EntryWhenMissing })}
+          className={selectCls}
+        >
+          {(["reject", "use_market", "use_default"] as EntryWhenMissing[]).map((v) => (
+            <option key={v} value={v}>{ENTRY_WHEN_MISSING_LABELS[v]}</option>
+          ))}
+        </select>
+      </div>
+
+      {useMarket && (
+        <p className="ml-[7.25rem] font-mono text-[.59rem] text-amber-400">
+          Market orders are placed immediately at the current price. % SL/TP defaults will only work if the signal includes a reference price — otherwise use fixed-price SL/TP defaults.
+        </p>
+      )}
+
+      {useDefault && (
+        <div className="ml-[7.25rem] flex items-center gap-2">
+          <label className="font-mono text-[.62rem] text-text-muted">Default limit price</label>
+          <input
+            type="number"
+            min={0.01}
+            step="any"
+            value={state.defaultLimitPrice}
+            onChange={(e) => onChange({ ...state, defaultLimitPrice: e.target.value })}
+            placeholder="220.00"
+            className={inputCls}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -294,6 +351,9 @@ export default function MissingFieldsForm({
   return (
     <div className="flex flex-col divide-y divide-border-subtle">
       <div className="pb-6">
+        <EntrySection state={state.entry} onChange={(entry) => onChange({ ...state, entry })} />
+      </div>
+      <div className="py-6">
         <SlSection state={state.sl} onChange={(sl) => onChange({ ...state, sl })} />
       </div>
       <div className="py-6">
