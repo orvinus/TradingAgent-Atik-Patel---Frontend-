@@ -253,7 +253,7 @@ export default function PreviewPanel({ draftConfig }: { draftConfig: NormalizedV
     if (!result) return "";
     const adj = result.adjusted ?? {};
     const tl = (adj.tp_levels ?? adj.tpLevels) as unknown;
-    return Array.isArray(tl) ? tl.join(", ") : "";
+    return Array.isArray(tl) ? tl.map(fmtTpLevel).join(", ") : "";
   }, [result]);
 
   return (
@@ -442,9 +442,24 @@ function KeyValueCard({ title, obj }: { title: string; obj: Record<string, unkno
   );
 }
 
+function fmtTpLevel(item: unknown): string {
+  if (item == null) return "—";
+  if (typeof item === "object" && !Array.isArray(item)) {
+    const o = item as Record<string, unknown>;
+    if (o.level != null) {
+      const parts = [String(o.level)];
+      if (o.exit_pct != null) parts.push(`${o.exit_pct}%`);
+      if (o.move_sl_to != null) parts.push(`→SL ${o.move_sl_to}`);
+      return parts.join(" ");
+    }
+    return JSON.stringify(item);
+  }
+  return String(item);
+}
+
 function fmt(v: unknown): string {
   if (v == null) return "—";
-  if (Array.isArray(v)) return v.join(", ");
+  if (Array.isArray(v)) return v.map(fmtTpLevel).join(", ");
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }
