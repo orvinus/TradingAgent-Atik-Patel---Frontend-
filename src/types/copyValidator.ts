@@ -52,6 +52,22 @@ export interface TrailingStopRule {
   trailAmount?: number;
 }
 
+export type SlippageMode = "off" | "auto" | "manual";
+
+export interface SlippageRule {
+  mode: SlippageMode;
+  maxPct?: number;
+}
+
+export interface SlippageResult {
+  enabled: boolean;
+  mode: SlippageMode;
+  maxPct?: number | null;
+  reference_price?: number | null;
+  original_limit_price?: number | null;
+  adjusted_limit_price?: number | null;
+}
+
 export interface ValidatorFields {
   entry?: SimpleFieldRule;
   sl?: PctFieldRule;
@@ -63,6 +79,7 @@ export interface ValidatorFields {
   orderType?: OrderTypeRule;
   side?: SimpleFieldRule;
   symbol?: SimpleFieldRule;
+  slippage?: SlippageRule;
 }
 
 // Keys of ValidatorFields, used to drive the rules table generically.
@@ -275,7 +292,7 @@ export interface TpLevel {
 }
 
 export interface PreSubmitCheck {
-  name: "options_enabled" | "market_hours" | "price_sanity" | "tradability" | "buying_power" | string;
+  name: "options_enabled" | "market_hours" | "price_sanity" | "tradability" | "buying_power" | "slippage" | string;
   ok: boolean;
   code?: string;
   message?: string;
@@ -284,6 +301,10 @@ export interface PreSubmitCheck {
   deviationPct?: number;
   required?: number;
   buyingPower?: number;
+  referencePrice?: number;
+  marketPrice?: number;
+  adverseSlippagePct?: number;
+  maxSlippagePct?: number;
 }
 
 export interface OrderPreview {
@@ -309,6 +330,8 @@ export interface OrderPreview {
   entry_display?: string | null;
   asset_class?: string | null;
   limit_price: number | null;
+  signal_limit_price?: number | null;
+  slippage?: SlippageResult | null;
   time_in_force?: string | null;
   trailing_stop?: { trailPct?: number; trailAmount?: number } | null;
 }

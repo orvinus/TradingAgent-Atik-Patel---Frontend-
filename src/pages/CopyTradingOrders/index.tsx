@@ -473,13 +473,20 @@ function OrderRow({ order, onConfirm }: { order: CopyOrder; onConfirm: () => voi
         {formatSizeLabel(p?.qty ?? p?.lot_size, p?.size_unit)}
       </td>
       <td className="px-3 py-2">
-        <EntryTypeBadge
-          orderType={p?.order_type}
-          limitPrice={p?.limit_price}
-          entryDisplay={p?.entry_display}
-          priceBasis={p?.price_basis}
-          profile={profile}
-        />
+        <div className="flex flex-col gap-0.5">
+          <EntryTypeBadge
+            orderType={p?.order_type}
+            limitPrice={p?.limit_price}
+            entryDisplay={p?.entry_display}
+            priceBasis={p?.price_basis}
+            profile={profile}
+          />
+          {p?.slippage?.enabled && p.signal_limit_price != null && p.limit_price != null && p.limit_price !== p.signal_limit_price && (
+            <span className="font-mono text-[.54rem] text-text-muted">
+              sig ${p.signal_limit_price} +{p.slippage.maxPct != null ? `${p.slippage.maxPct}%` : "slip"}
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-3 py-2 font-mono text-[.63rem] text-bear">
         {p?.sl_price != null ? `$${p.sl_price}` : "—"}

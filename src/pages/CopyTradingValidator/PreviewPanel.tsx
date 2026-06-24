@@ -348,6 +348,65 @@ export default function PreviewPanel({ draftConfig }: { draftConfig: NormalizedV
   );
 }
 
+// ── Slippage row ─────────────────────────────────────────────────────────────
+
+interface SlippageAdj {
+  enabled?: boolean;
+  mode?: string;
+  maxPct?: number | null;
+  reference_price?: number | null;
+  original_limit_price?: number | null;
+  adjusted_limit_price?: number | null;
+}
+
+function SlippagePreviewRow({ adjusted }: { adjusted: Record<string, unknown> }) {
+  const slip = adjusted.slippage as SlippageAdj | null | undefined;
+  if (!slip?.enabled) return null;
+
+  const orderType = adjusted.order_type as string | null | undefined;
+  const isMarket = orderType === "market";
+  const maxPct = slip.maxPct;
+  const refPrice = slip.reference_price ?? slip.original_limit_price;
+  const submitPrice = slip.adjusted_limit_price ?? (adjusted.limit_price as number | null);
+
+  return (
+    <div className="rounded-sm border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+      <p className="mb-1.5 font-mono text-[.56rem] uppercase tracking-widest text-amber-400">
+        Slippage {slip.mode} {maxPct != null ? `· ${maxPct}%` : "· 0.5% (server default)"}
+      </p>
+      {isMarket ? (
+        <div className="font-mono text-[.63rem] text-text-secondary">
+          <span className="text-text-muted">Signal ref:</span>{" "}
+          {refPrice != null ? `$${refPrice}` : "—"}
+          <span className="mx-2 text-text-disabled">·</span>
+          <span className="text-text-muted">Max slip:</span>{" "}
+          {maxPct != null ? `${maxPct}%` : "0.5% (default)"}
+          <span className="ml-2 font-mono text-[.58rem] text-amber-400">
+            Order rejected if market exceeds tolerance at confirm
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[.63rem]">
+          <span>
+            <span className="text-text-muted">Signal entry:</span>{" "}
+            <span className="font-bold text-text-primary">{refPrice != null ? `$${refPrice}` : "—"}</span>
+          </span>
+          <span className="text-text-disabled">→</span>
+          <span>
+            <span className="text-text-muted">Submit limit:</span>{" "}
+            <span className="font-bold text-bull">{submitPrice != null ? `$${submitPrice}` : "—"}</span>
+            {maxPct != null && refPrice != null && submitPrice != null && (
+              <span className="ml-1 text-text-muted text-[.58rem]">
+                (+{maxPct}% widened)
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Result ──────────────────────────────────────────────────────────────────
 function ResultView({ result, tpList }: { result: ValidateResult; tpList: string }) {
   return (
@@ -371,6 +430,8 @@ function ResultView({ result, tpList }: { result: ValidateResult; tpList: string
       {tpList && (
         <div className="font-mono text-[.62rem] text-text-muted">Adjusted TP levels: {tpList}</div>
       )}
+
+      <SlippagePreviewRow adjusted={result.adjusted} />
 
       {/* Violations */}
       {(result.violations ?? []).length > 0 && (
