@@ -11,7 +11,7 @@ import { qk } from "@/api/queryKeys";
 import { toast } from "@/components/ui/Toast";
 import {
   LuLoader, LuPlus, LuRefreshCw, LuCheck, LuX, LuArrowLeft,
-  LuTrash2, LuSearch, LuChevronLeft, LuChevronRight,
+  LuTrash2, LuSearch, LuChevronLeft, LuChevronRight, LuLogOut,
 } from "react-icons/lu";
 import {
   getBrokerInfo,
@@ -319,6 +319,7 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
   const [hasStop, setHasStop] = useState<HasFilter>("all");
   const [minQty, setMinQty] = useState("");
   const [showSubmit, setShowSubmit] = useState(false);
+  const [exitPosition, setExitPosition] = useState<{ symbol: string; maxQty: string } | null>(null);
   const qc = useQueryClient();
 
   const VIEWS: { id: View; label: string }[] = [
@@ -509,7 +510,7 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
 
       {/* Table */}
       <div className="rounded-lg border border-border-subtle bg-bg-surface p-4">
-        {view === "positions" && <PositionsTable cid={cid} broker={broker} search={search} />}
+        {view === "positions" && <PositionsTable cid={cid} broker={broker} search={search} onExit={(symbol, qty) => setExitPosition({ symbol, maxQty: qty })} />}
         {view === "orders"    && <OrdersTable    cid={cid} broker={broker} search={search} side={side} status={orderStatus} orderType={orderType} detailStatus={detailStatus} hasLimit={hasLimit} hasStop={hasStop} minQty={minQty} />}
         {view === "fills"     && <FillsTable     cid={cid} broker={broker} search={search} side={side} />}
       </div>
@@ -521,6 +522,21 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
           onClose={() => setShowSubmit(false)}
           onSubmitted={() => {
             setShowSubmit(false);
+            qc.invalidateQueries({ queryKey: ordersKey(broker, cid, orderStatus) });
+          }}
+        />
+      )}
+
+      {exitPosition && (
+        <ExitPositionModal
+          cid={cid}
+          broker={broker}
+          symbol={exitPosition.symbol}
+          maxQty={exitPosition.maxQty}
+          onClose={() => setExitPosition(null)}
+          onSubmitted={() => {
+            setExitPosition(null);
+            qc.invalidateQueries({ queryKey: positionsKey(broker, cid) });
             qc.invalidateQueries({ queryKey: ordersKey(broker, cid, orderStatus) });
           }}
         />
@@ -624,7 +640,17 @@ function Pagination({
 
 // ── Positions ──────────────────────────────────────────────────────────────
 
-function PositionsTable({ cid, broker, search }: { cid: string; broker: BrokerType; search: string }) {
+function PositionsTable({
+  cid,
+  broker,
+  search,
+  onExit,
+}: {
+  cid: string;
+  broker: BrokerType;
+  search: string;
+  onExit: (symbol: string, qty: string) => void;
+}) {
   const api = useBrokerApi(broker);
   const [page, setPage] = useState(1);
 
@@ -652,7 +678,7 @@ function PositionsTable({ cid, broker, search }: { cid: string; broker: BrokerTy
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-border-subtle">
-              {["Symbol", "Qty", "Avg Cost", "Mark Price", "Unrealized P&L"].map((h) => (
+              {["Symbol", "Qty", "Avg Cost", "Mark Price", "Unrealized P&L", ""].map((h) => (
                 <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
                   {h}
                 </th>
@@ -668,8 +694,17 @@ function PositionsTable({ cid, broker, search }: { cid: string; broker: BrokerTy
                   <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">{pos.qty}</td>
                   <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">${parseFloat(pos.avg_cost).toFixed(2)}</td>
                   <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">${parseFloat(pos.mark_price).toFixed(2)}</td>
-                  <td className={`py-2.5 font-mono text-sm font-bold ${pnl >= 0 ? "text-bull" : "text-bear"}`}>
+                  <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${pnl >= 0 ? "text-bull" : "text-bear"}`}>
                     {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+                  </td>
+                  <td className="py-2.5">
+                    <button
+                      onClick={() => onExit(pos.symbol, pos.qty)}
+                      className="flex items-center gap-1.5 rounded-sm border border-bear/40 bg-bear/10 px-2.5 py-1 font-mono text-[.62rem] font-bold uppercase tracking-widest text-bear transition-colors hover:bg-bear/20"
+                    >
+                      <LuLogOut className="h-3 w-3" />
+                      Exit
+                    </button>
                   </td>
                 </tr>
               );
@@ -922,6 +957,236 @@ function FillsTable({
         </table>
       </div>
       <Pagination page={page} total={rows.length} onPage={setPage} />
+    </div>
+  );
+}
+
+// ── Exit Position Modal ───────────────────────────────────────────────────────
+
+function ExitPositionModal({
+  cid,
+  broker,
+  symbol,
+  maxQty,
+  onClose,
+  onSubmitted,
+}: {
+  cid: string;
+  broker: BrokerType;
+  symbol: string;
+  maxQty: string;
+  onClose: () => void;
+  onSubmitted: () => void;
+}) {
+  const api = useBrokerApi(broker);
+  const maxQtyNum = parseFloat(maxQty);
+  const isWholeShare = broker === "tradier";
+
+  const [orderType, setOrderType] = useState<"market" | "limit">("market");
+  const [qty, setQty] = useState(maxQty);
+  const [limitPrice, setLimitPrice] = useState("");
+  const [tif, setTif] = useState<TimeInForce>("DAY");
+
+  const qtyNum = parseFloat(qty);
+  const qtyValid = !isNaN(qtyNum) && qtyNum > 0 && qtyNum <= maxQtyNum && (!isWholeShare || Number.isInteger(qtyNum));
+
+  const canSubmit =
+    qtyValid &&
+    (orderType !== "limit" || limitPrice.trim().length > 0) &&
+    !false;
+
+  const submitMut = useMutation({
+    mutationFn: () => {
+      const payload = {
+        client_order_id: `exit-${Date.now()}`,
+        symbol,
+        asset_class: "equity" as const,
+        side: "sell" as const,
+        order_type: orderType,
+        qty: qty.trim(),
+        ...(orderType === "limit" && limitPrice ? { limit_price: limitPrice } : {}),
+        time_in_force: tif,
+      };
+      return api.submitOrder(cid, payload);
+    },
+    onSuccess: (res) => {
+      toast.success(`Exit order submitted — ${res.broker_order_id.slice(0, 8)}…`);
+      onSubmitted();
+    },
+    onError: (err) => {
+      const msg = axios.isAxiosError(err) ? err.response?.data?.message : null;
+      toast.error(msg ?? "Failed to submit exit order.");
+    },
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-lg border border-border-default bg-bg-surface shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border-subtle px-5 py-4">
+          <div>
+            <h2 className="font-display text-base font-bold uppercase tracking-[.1em] text-text-primary">
+              Exit Position
+            </h2>
+            <p className="mt-0.5 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
+              {broker} · sell order
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-sm p-1 text-text-muted transition-colors hover:text-text-primary">
+            <LuX className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-4 px-5 py-5">
+          {/* Symbol — locked */}
+          <div>
+            <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+              Symbol <span className="normal-case tracking-normal text-text-disabled">(locked)</span>
+            </label>
+            <div className="flex items-center gap-2 rounded-sm border border-border-subtle bg-bg-elevated px-3 py-2">
+              <span className="font-display text-sm font-bold uppercase tracking-wider text-text-primary">{symbol}</span>
+              <span className="ml-auto font-mono text-[.62rem] text-text-disabled">
+                {maxQty} shares held
+              </span>
+            </div>
+          </div>
+
+          {/* Order type */}
+          <div>
+            <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+              Order Type
+            </label>
+            <div className="flex gap-2">
+              {(["market", "limit"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setOrderType(t)}
+                  className={`flex-1 rounded-sm border py-1.5 font-mono text-[.68rem] uppercase tracking-widest transition-colors ${
+                    orderType === t
+                      ? "border-accent bg-accent text-bg-base"
+                      : "border-border-default bg-bg-elevated text-text-secondary hover:border-accent hover:text-accent"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quantity */}
+          <div>
+            <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+              Quantity to Sell
+              <span className="ml-2 normal-case tracking-normal text-text-disabled">
+                max {maxQty}
+              </span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={isWholeShare ? "1" : "0.000001"}
+                max={maxQty}
+                step={isWholeShare ? "1" : "any"}
+                value={qty}
+                onChange={(e) => setQty(e.target.value)}
+                className={`flex-1 rounded-sm border px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-disabled focus:outline-none ${
+                  qty && !qtyValid ? "border-bear focus:border-bear" : "border-border-default bg-bg-elevated focus:border-accent"
+                }`}
+              />
+              <button
+                onClick={() => setQty(maxQty)}
+                className="rounded-sm border border-border-default bg-bg-elevated px-2.5 py-2 font-mono text-[.62rem] uppercase tracking-widest text-text-muted transition-colors hover:border-accent hover:text-accent"
+              >
+                Max
+              </button>
+            </div>
+            {qty && !qtyValid && (
+              <p className="mt-1 font-mono text-[.58rem] text-bear">
+                {qtyNum > maxQtyNum
+                  ? `Cannot exceed position size (${maxQty})`
+                  : isWholeShare
+                    ? "Must be a whole number greater than 0"
+                    : "Must be greater than 0"}
+              </p>
+            )}
+          </div>
+
+          {/* Limit price */}
+          {orderType === "limit" && (
+            <div>
+              <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+                Limit Price
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={limitPrice}
+                onChange={(e) => setLimitPrice(e.target.value)}
+                placeholder="e.g. 185.00"
+                className="w-full rounded-sm border border-border-default bg-bg-elevated px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-disabled focus:border-accent focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Time in Force */}
+          <div>
+            <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+              Time in Force
+            </label>
+            <select
+              value={tif}
+              onChange={(e) => setTif(e.target.value as TimeInForce)}
+              className="w-full rounded-sm border border-border-default bg-bg-elevated px-3 py-2 font-mono text-sm text-text-primary focus:border-accent focus:outline-none"
+            >
+              <option value="DAY">DAY</option>
+              <option value="GTC">GTC</option>
+              <option value="IOC">IOC</option>
+              <option value="FOK">FOK</option>
+            </select>
+          </div>
+
+          {/* Summary */}
+          <div className="rounded-sm border border-bear/20 bg-bear/5 px-3 py-2.5">
+            <p className="font-mono text-[.62rem] text-text-secondary">
+              <span className="font-bold text-bear">SELL</span>{" "}
+              <span className="font-bold text-text-primary">{qtyValid ? qty : "—"}</span>{" "}
+              <span className="text-text-muted">{symbol}</span>
+              {orderType === "limit" && limitPrice && (
+                <> <span className="text-text-disabled">@</span>{" "}
+                <span className="font-bold text-text-primary">${limitPrice}</span></>
+              )}
+              {orderType === "market" && (
+                <> <span className="text-text-disabled">@ market price</span></>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 border-t border-border-subtle px-5 py-4">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-sm border border-border-default bg-bg-elevated py-2 font-mono text-[.7rem] uppercase tracking-widest text-text-secondary transition-colors hover:text-text-primary"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => submitMut.mutate()}
+            disabled={!canSubmit || submitMut.isPending}
+            className="flex flex-1 items-center justify-center gap-2 rounded-sm bg-bear py-2 font-mono text-[.7rem] font-bold uppercase tracking-widest text-white transition-colors hover:bg-bear/80 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitMut.isPending ? (
+              <><LuLoader className="h-3.5 w-3.5 animate-spin" /> Submitting…</>
+            ) : (
+              <><LuLogOut className="h-3.5 w-3.5" /> Sell {qtyValid ? qty : "—"} {symbol}</>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
