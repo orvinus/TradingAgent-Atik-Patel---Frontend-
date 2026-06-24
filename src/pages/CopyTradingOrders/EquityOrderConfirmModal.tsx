@@ -12,7 +12,7 @@ import { InstrumentBadge } from "@/components/copy-trading/InstrumentBadge";
 import { PreSubmitChecksPanel } from "@/components/copy-trading/PreSubmitChecksPanel";
 import { EntryTypeToggle, MarketOrderBanner } from "@/components/copy-trading/EntryTypeBadge";
 import { isMarketOrder, mapErrorCode } from "@/utils/copyTradingFormatters";
-import type { CopyOrder, OrderEdits, OrderPreview, PreSubmitCheck, SlippageResult } from "@/types/copyValidator";
+import type { CopyOrder, OrderEdits, OrderPreview, PreSubmitCheck, SlippageResult, SpreadResult } from "@/types/copyValidator";
 
 type TpMode = "single" | "multi";
 type MoveSlTo = "none" | "entry" | "breakeven";
@@ -282,6 +282,59 @@ function SlippageInfoBlock({
   );
 }
 
+// ── Spread info block ──────────────────────────────────────────────────────────
+
+function SpreadInfoBlock({
+  spread,
+  orderType,
+}: {
+  spread: SpreadResult;
+  orderType: "market" | "limit";
+}) {
+  const maxPct = spread.maxPct;
+  const bid = spread.bid;
+  const ask = spread.ask;
+  const spreadPct = spread.spreadPct;
+  const crossedPrice = spread.crossed_limit_price;
+  const beforeCross = spread.limit_before_cross;
+
+  if (orderType === "market") {
+    return (
+      <div className="rounded-sm border border-sky-500/30 bg-sky-500/5 px-3 py-2.5">
+        <p className="mb-1 font-mono text-[.56rem] uppercase tracking-widest text-sky-400">Spread check</p>
+        <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[.62rem] text-text-secondary">
+          <span><span className="text-text-muted">Max spread:</span> {maxPct != null ? `${maxPct}%` : "1% (default)"}</span>
+          {bid != null && <span><span className="text-text-muted">Bid:</span> ${bid}</span>}
+          {ask != null && <span><span className="text-text-muted">Ask:</span> ${ask}</span>}
+          {spreadPct != null && <span><span className="text-text-muted">Live spread:</span> {spreadPct.toFixed(2)}%</span>}
+        </div>
+        <p className="mt-1 font-mono text-[.58rem] text-sky-300">
+          Order rejected if spread exceeds tolerance at submit time.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-sm border border-sky-500/20 bg-sky-500/5 px-3 py-2.5">
+      <p className="mb-1 font-mono text-[.56rem] uppercase tracking-widest text-sky-400">
+        Spread check{maxPct != null ? ` · max ${maxPct}%` : ""}
+      </p>
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[.62rem]">
+        {bid != null && <span><span className="text-text-muted">Bid:</span> ${bid}</span>}
+        {ask != null && <span><span className="text-text-muted">Ask:</span> ${ask}</span>}
+        {spreadPct != null && <span><span className="text-text-muted">Spread:</span> {spreadPct.toFixed(2)}%</span>}
+      </div>
+      {spread.crossSpread && crossedPrice != null && (
+        <p className="mt-0.5 font-mono text-[.58rem] text-text-muted">
+          Limit crossed to ask ${crossedPrice}
+          {beforeCross != null ? ` (was $${beforeCross})` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ── Main modal ─────────────────────────────────────────────────────────────────
 
 export default function EquityOrderConfirmModal({
@@ -473,6 +526,14 @@ export default function EquityOrderConfirmModal({
             {preview?.slippage?.enabled && (
               <SlippageInfoBlock
                 slippage={preview.slippage}
+                orderType={orderTypeMode}
+              />
+            )}
+
+            {/* Spread info */}
+            {preview?.spread?.enabled && (
+              <SpreadInfoBlock
+                spread={preview.spread}
                 orderType={orderTypeMode}
               />
             )}

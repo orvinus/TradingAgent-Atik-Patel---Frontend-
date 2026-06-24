@@ -10,6 +10,7 @@ const CHECK_LABELS: Record<string, string> = {
   tradability: "Contract tradability",
   buying_power: "Buying power",
   slippage: "Slippage tolerance",
+  spread: "Spread tolerance",
 };
 
 interface Props {
@@ -53,6 +54,13 @@ export function PreSubmitChecksPanel({ checks, errorCode, errorMessage }: Props)
               Moved {failedCheck.adverseSlippagePct.toFixed(2)}% vs max {failedCheck.maxSlippagePct?.toFixed(2) ?? "—"}%
               {failedCheck.referencePrice != null ? ` · Signal ref $${failedCheck.referencePrice}` : ""}
               {failedCheck.marketPrice != null ? ` · Market $${failedCheck.marketPrice}` : ""}
+            </p>
+          )}
+          {failedCheck.spreadPct != null && (
+            <p className="mt-0.5 font-mono text-[.6rem] text-text-muted">
+              Spread {failedCheck.spreadPct.toFixed(2)}% vs max {failedCheck.maxSpreadPct?.toFixed(2) ?? "—"}%
+              {failedCheck.bid != null ? ` · Bid $${failedCheck.bid}` : ""}
+              {failedCheck.ask != null ? ` · Ask $${failedCheck.ask}` : ""}
             </p>
           )}
         </div>

@@ -407,6 +407,70 @@ function SlippagePreviewRow({ adjusted }: { adjusted: Record<string, unknown> })
   );
 }
 
+// ── Spread preview row ────────────────────────────────────────────────────────
+
+interface SpreadAdj {
+  enabled?: boolean;
+  mode?: string;
+  maxPct?: number | null;
+  bid?: number | null;
+  ask?: number | null;
+  spreadPct?: number | null;
+  crossSpread?: boolean | null;
+  crossed_limit_price?: number | null;
+  limit_before_cross?: number | null;
+}
+
+function SpreadPreviewRow({ adjusted }: { adjusted: Record<string, unknown> }) {
+  const spread = adjusted.spread as SpreadAdj | null | undefined;
+  if (!spread?.enabled) return null;
+
+  const orderType = adjusted.order_type as string | null | undefined;
+  const isMarket = orderType === "market";
+  const maxPct = spread.maxPct;
+  const bid = spread.bid;
+  const ask = spread.ask;
+  const spreadPct = spread.spreadPct;
+
+  return (
+    <div className="rounded-sm border border-sky-500/30 bg-sky-500/5 px-3 py-2.5">
+      <p className="mb-1.5 font-mono text-[.56rem] uppercase tracking-widest text-sky-400">
+        Spread {spread.mode} {maxPct != null ? `· max ${maxPct}%` : "· 1% (server default)"}
+      </p>
+      {bid != null && ask != null && (
+        <div className="mb-1 font-mono text-[.63rem] text-text-secondary">
+          <span className="text-text-muted">Bid:</span> ${bid}
+          <span className="mx-2 text-text-disabled">·</span>
+          <span className="text-text-muted">Ask:</span> ${ask}
+          {spreadPct != null && (
+            <>
+              <span className="mx-2 text-text-disabled">·</span>
+              <span className="text-text-muted">Spread:</span> {spreadPct.toFixed(2)}%
+            </>
+          )}
+        </div>
+      )}
+      {isMarket ? (
+        <span className="font-mono text-[.58rem] text-sky-400">
+          Order rejected if spread exceeds tolerance at confirm
+        </span>
+      ) : spread.crossSpread && spread.crossed_limit_price != null ? (
+        <div className="font-mono text-[.63rem] text-text-secondary">
+          <span className="text-text-muted">Limit crossed to ask:</span>{" "}
+          <span className="font-bold text-bull">${spread.crossed_limit_price}</span>
+          {spread.limit_before_cross != null && (
+            <span className="ml-1.5 text-[.58rem] text-text-muted">(was ${spread.limit_before_cross})</span>
+          )}
+        </div>
+      ) : (
+        <span className="font-mono text-[.58rem] text-sky-400">
+          Spread within tolerance — limit submitted as-is
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Result ──────────────────────────────────────────────────────────────────
 function ResultView({ result, tpList }: { result: ValidateResult; tpList: string }) {
   return (
@@ -432,6 +496,7 @@ function ResultView({ result, tpList }: { result: ValidateResult; tpList: string
       )}
 
       <SlippagePreviewRow adjusted={result.adjusted} />
+      <SpreadPreviewRow adjusted={result.adjusted} />
 
       {/* Violations */}
       {(result.violations ?? []).length > 0 && (
