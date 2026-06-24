@@ -382,9 +382,7 @@ export default function OptionsOrderConfirmModal({
   const collectEdits = (): OrderEdits => {
     const e: OrderEdits = {};
     e.order_type = orderTypeMode;
-    if (orderTypeMode === "market") {
-      e.limit_price = null;
-    } else {
+    if (orderTypeMode !== "market") {
       const premium = num(edits.premium);
       if (premium != null) e.limit_price = premium;
     }

@@ -373,9 +373,7 @@ export default function EquityOrderConfirmModal({
     const e: OrderEdits = {};
     if (edits.symbol.trim()) e.symbol = edits.symbol.trim();
     e.order_type = orderTypeMode;
-    if (orderTypeMode === "market") {
-      e.limit_price = null;
-    } else {
+    if (orderTypeMode !== "market") {
       const entry = num(edits.entry);
       if (entry != null) e.limit_price = entry;
     }
