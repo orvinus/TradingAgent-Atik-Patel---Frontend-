@@ -9,6 +9,7 @@ const CHECK_LABELS: Record<string, string> = {
   price_sanity: "Price sanity",
   tradability: "Contract tradability",
   buying_power: "Buying power",
+  slippage: "Slippage tolerance",
 };
 
 interface Props {
@@ -45,6 +46,13 @@ export function PreSubmitChecksPanel({ checks, errorCode, errorMessage }: Props)
           {failedCheck.required != null && failedCheck.buyingPower != null && (
             <p className="mt-0.5 font-mono text-[.6rem] text-text-muted">
               Required: ${failedCheck.required.toLocaleString()} · Available: ${failedCheck.buyingPower.toLocaleString()}
+            </p>
+          )}
+          {failedCheck.adverseSlippagePct != null && (
+            <p className="mt-0.5 font-mono text-[.6rem] text-text-muted">
+              Moved {failedCheck.adverseSlippagePct.toFixed(2)}% vs max {failedCheck.maxSlippagePct?.toFixed(2) ?? "—"}%
+              {failedCheck.referencePrice != null ? ` · Signal ref $${failedCheck.referencePrice}` : ""}
+              {failedCheck.marketPrice != null ? ` · Market $${failedCheck.marketPrice}` : ""}
             </p>
           )}
         </div>

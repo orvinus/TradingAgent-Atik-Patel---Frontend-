@@ -59,6 +59,8 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     "Cannot apply % defaults on market orders without a limit price. Use fixed-price defaults or require SL/TP in the signal.",
   LIMIT_PRICE_REQUIRED:
     "Your validator requires a limit price but this signal is a market order. Set order type to Auto in Validation & Limits.",
+  SLIPPAGE_EXCEEDED:
+    "Price moved too far from the signal. Order not sent.",
 };
 
 export function mapErrorCode(code: string | null | undefined, fallback?: string): string {

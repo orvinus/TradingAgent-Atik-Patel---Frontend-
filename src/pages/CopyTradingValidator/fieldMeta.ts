@@ -5,7 +5,7 @@
 // UI is fully functional even before (or without) the options call.
 import type { ValidatorFieldKey, OrderTypeValue } from "@/types/copyValidator";
 
-export type FieldKind = "pct" | "lotSize" | "orderType" | "mode" | "trailingStop";
+export type FieldKind = "pct" | "lotSize" | "orderType" | "mode" | "trailingStop" | "slippage";
 
 export interface FieldDef {
   key: ValidatorFieldKey;
@@ -55,6 +55,12 @@ export const FIELD_DEFS: FieldDef[] = [
   { key: "entry", label: "Entry price", kind: "mode", tooltip: "Use the entry price from the signal." },
   { key: "side", label: "Side", kind: "mode", tooltip: "Use the buy/sell side from the signal." },
   { key: "symbol", label: "Symbol", kind: "mode", tooltip: "Use the symbol from the signal." },
+  {
+    key: "slippage",
+    label: "Slippage tolerance",
+    kind: "slippage",
+    tooltip: "Maximum price movement from signal entry before reject (market) or limit widen (limit). Auto uses server default 0.5% when no value set.",
+  },
 ];
 
 export const ORDER_TYPE_OPTIONS: OrderTypeValue[] = ["market", "limit", "stop", "stop_limit"];

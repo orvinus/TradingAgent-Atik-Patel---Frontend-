@@ -1,7 +1,7 @@
 // src/pages/CopyTradingValidator/PreviewPanel.tsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { LuLoader, LuCircleCheck, LuCircleX } from "react-icons/lu";
+import { LuLoader, LuCircleCheck, LuCircleX, LuChevronDown } from "react-icons/lu";
 import axios from "axios";
 import { copyValidatorApi } from "@/api/endpoints/copyValidator";
 import { copyTradingApi } from "@/api/endpoints/copyTrading";
@@ -36,6 +36,144 @@ function signalLabel(s: Record<string, unknown>): string {
   const side = (s.side as string)?.toUpperCase() ?? "";
   const entry = s.limit_price ?? s.entry ?? s.entry_price;
   return `${side} ${sym}${entry != null ? ` @ ${entry}` : ""}`.trim();
+}
+
+// ── Signal picker ────────────────────────────────────────────────────────────
+
+type SignalItem = {
+  id: string;
+  createdAt: string;
+  parseable?: boolean;
+  signal?: { raw_text?: string | null; symbol?: unknown; side?: unknown; limit_price?: unknown; entry?: unknown; entry_price?: unknown } | Record<string, unknown> | null;
+  rawText?: string | null;
+};
+
+function SignalSelect({
+  signals,
+  value,
+  onChange,
+  loading,
+}: {
+  signals: SignalItem[];
+  value: string;
+  onChange: (id: string) => void;
+  loading: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = signals.find((s) => s.id === value);
+
+  const formatDate = (iso: string) => {
+    const d = new Date(iso);
+    return {
+      date: d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+      time: d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+    };
+  };
+
+  const getAiLabel = (s: SignalItem) => {
+    const sig = (s.signal ?? {}) as Record<string, unknown>;
+    const label = signalLabel(sig);
+    if (label === "?" || label === "") return null;
+    return label;
+  };
+
+  const getRawText = (s: SignalItem): string => {
+    const sig = (s.signal ?? {}) as Record<string, unknown>;
+    return (sig.raw_text as string) ?? s.rawText ?? "";
+  };
+
+  const triggerCls =
+    "flex min-w-[18rem] flex-1 items-center justify-between gap-2 rounded-sm border border-border-default bg-bg-base px-2 py-1.5 font-mono text-[.68rem] text-text-primary outline-none focus:border-accent cursor-pointer select-none";
+
+  return (
+    <div ref={ref} className="relative min-w-[18rem] flex-1">
+      <button
+        type="button"
+        onClick={() => !loading && setOpen((o) => !o)}
+        disabled={loading}
+        className={`${triggerCls} w-full disabled:opacity-50 disabled:cursor-not-allowed`}
+      >
+        <span className="truncate text-left">
+          {loading ? (
+            <span className="text-text-muted">Loading signals…</span>
+          ) : selected ? (
+            <span className="flex items-baseline gap-1.5">
+              {getAiLabel(selected) && (
+                <span className="font-semibold text-text-primary">{getAiLabel(selected)}</span>
+              )}
+              <span className="truncate text-text-muted">
+                {getRawText(selected).slice(0, 60)}{getRawText(selected).length > 60 ? "…" : ""}
+              </span>
+            </span>
+          ) : (
+            <span className="text-text-muted">Select a recent signal…</span>
+          )}
+        </span>
+        <LuChevronDown
+          className={`h-3.5 w-3.5 flex-shrink-0 text-text-muted transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-full min-w-[24rem] overflow-hidden rounded-sm border border-border-default bg-bg-surface shadow-lg">
+          <div className="max-h-72 overflow-y-auto">
+            {signals.length === 0 ? (
+              <div className="px-3 py-3 font-mono text-[.62rem] text-text-muted">No signals found.</div>
+            ) : (
+              signals.map((s) => {
+                const aiLabel = getAiLabel(s);
+                const rawText = getRawText(s);
+                const { date, time } = formatDate(s.createdAt);
+                const isSelected = s.id === value;
+
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => { onChange(s.id); setOpen(false); }}
+                    className={`flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-bg-elevated ${
+                      isSelected ? "bg-accent/10" : ""
+                    } border-b border-border-subtle last:border-0`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      {aiLabel ? (
+                        <div className="mb-0.5 font-mono text-[.66rem] font-semibold text-text-primary">
+                          {aiLabel}
+                        </div>
+                      ) : (
+                        <div className="mb-0.5 font-mono text-[.6rem] uppercase tracking-wider text-text-muted">
+                          Unparseable
+                        </div>
+                      )}
+                      {rawText && (
+                        <div className="font-mono text-[.6rem] leading-relaxed text-text-muted line-clamp-2">
+                          {rawText}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-shrink-0 flex-col items-end gap-0.5">
+                      <span className="font-mono text-[.58rem] text-text-secondary">{date}</span>
+                      <span className="font-mono text-[.58rem] text-text-muted">{time}</span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function PreviewPanel({ draftConfig }: { draftConfig: NormalizedValidatorConfig }) {
@@ -115,7 +253,7 @@ export default function PreviewPanel({ draftConfig }: { draftConfig: NormalizedV
     if (!result) return "";
     const adj = result.adjusted ?? {};
     const tl = (adj.tp_levels ?? adj.tpLevels) as unknown;
-    return Array.isArray(tl) ? tl.join(", ") : "";
+    return Array.isArray(tl) ? tl.map(fmtTpLevel).join(", ") : "";
   }, [result]);
 
   return (
@@ -156,19 +294,12 @@ export default function PreviewPanel({ draftConfig }: { draftConfig: NormalizedV
             <option value="telegram">Telegram</option>
             <option value="discord">Discord</option>
           </select>
-          <select
+          <SignalSelect
+            signals={signals}
             value={signalId}
-            onChange={(e) => setSignalId(e.target.value)}
-            disabled={signalsLoading}
-            className={`${inputCls} min-w-[16rem] flex-1`}
-          >
-            <option value="">{signalsLoading ? "Loading signals…" : "Select a recent signal…"}</option>
-            {signals.map((s) => (
-              <option key={s.id} value={s.id}>
-                {signalLabel((s.signal ?? {}) as Record<string, unknown>)} · {new Date(s.createdAt).toLocaleString()}
-              </option>
-            ))}
-          </select>
+            onChange={setSignalId}
+            loading={signalsLoading}
+          />
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -217,6 +348,65 @@ export default function PreviewPanel({ draftConfig }: { draftConfig: NormalizedV
   );
 }
 
+// ── Slippage row ─────────────────────────────────────────────────────────────
+
+interface SlippageAdj {
+  enabled?: boolean;
+  mode?: string;
+  maxPct?: number | null;
+  reference_price?: number | null;
+  original_limit_price?: number | null;
+  adjusted_limit_price?: number | null;
+}
+
+function SlippagePreviewRow({ adjusted }: { adjusted: Record<string, unknown> }) {
+  const slip = adjusted.slippage as SlippageAdj | null | undefined;
+  if (!slip?.enabled) return null;
+
+  const orderType = adjusted.order_type as string | null | undefined;
+  const isMarket = orderType === "market";
+  const maxPct = slip.maxPct;
+  const refPrice = slip.reference_price ?? slip.original_limit_price;
+  const submitPrice = slip.adjusted_limit_price ?? (adjusted.limit_price as number | null);
+
+  return (
+    <div className="rounded-sm border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+      <p className="mb-1.5 font-mono text-[.56rem] uppercase tracking-widest text-amber-400">
+        Slippage {slip.mode} {maxPct != null ? `· ${maxPct}%` : "· 0.5% (server default)"}
+      </p>
+      {isMarket ? (
+        <div className="font-mono text-[.63rem] text-text-secondary">
+          <span className="text-text-muted">Signal ref:</span>{" "}
+          {refPrice != null ? `$${refPrice}` : "—"}
+          <span className="mx-2 text-text-disabled">·</span>
+          <span className="text-text-muted">Max slip:</span>{" "}
+          {maxPct != null ? `${maxPct}%` : "0.5% (default)"}
+          <span className="ml-2 font-mono text-[.58rem] text-amber-400">
+            Order rejected if market exceeds tolerance at confirm
+          </span>
+        </div>
+      ) : (
+        <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[.63rem]">
+          <span>
+            <span className="text-text-muted">Signal entry:</span>{" "}
+            <span className="font-bold text-text-primary">{refPrice != null ? `$${refPrice}` : "—"}</span>
+          </span>
+          <span className="text-text-disabled">→</span>
+          <span>
+            <span className="text-text-muted">Submit limit:</span>{" "}
+            <span className="font-bold text-bull">{submitPrice != null ? `$${submitPrice}` : "—"}</span>
+            {maxPct != null && refPrice != null && submitPrice != null && (
+              <span className="ml-1 text-text-muted text-[.58rem]">
+                (+{maxPct}% widened)
+              </span>
+            )}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Result ──────────────────────────────────────────────────────────────────
 function ResultView({ result, tpList }: { result: ValidateResult; tpList: string }) {
   return (
@@ -240,6 +430,8 @@ function ResultView({ result, tpList }: { result: ValidateResult; tpList: string
       {tpList && (
         <div className="font-mono text-[.62rem] text-text-muted">Adjusted TP levels: {tpList}</div>
       )}
+
+      <SlippagePreviewRow adjusted={result.adjusted} />
 
       {/* Violations */}
       {(result.violations ?? []).length > 0 && (
@@ -311,9 +503,24 @@ function KeyValueCard({ title, obj }: { title: string; obj: Record<string, unkno
   );
 }
 
+function fmtTpLevel(item: unknown): string {
+  if (item == null) return "—";
+  if (typeof item === "object" && !Array.isArray(item)) {
+    const o = item as Record<string, unknown>;
+    if (o.level != null) {
+      const parts = [String(o.level)];
+      if (o.exit_pct != null) parts.push(`${o.exit_pct}%`);
+      if (o.move_sl_to != null) parts.push(`→SL ${o.move_sl_to}`);
+      return parts.join(" ");
+    }
+    return JSON.stringify(item);
+  }
+  return String(item);
+}
+
 function fmt(v: unknown): string {
   if (v == null) return "—";
-  if (Array.isArray(v)) return v.join(", ");
+  if (Array.isArray(v)) return v.map(fmtTpLevel).join(", ");
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
 }

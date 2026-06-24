@@ -47,6 +47,11 @@ const normSide = (raw: string | undefined): string =>
 const normEnum = (raw: string | undefined): string =>
   raw?.split(".").pop()?.toUpperCase() ?? "—";
 
+// Strips enum prefixes ("ORDERSTATUS.canceled") and normalises British
+// "cancelled" → "canceled" so filter comparisons always use one spelling.
+const normStatus = (raw: string | undefined): string =>
+  (raw?.split(".").pop() ?? "").toLowerCase().replace("cancelled", "canceled");
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function BrokerDetail() {
@@ -300,11 +305,19 @@ function SectionHeader({ label }: { label: string }) {
 
 type View = "positions" | "orders" | "fills";
 
+type DetailStatus = "all" | "filled" | "canceled" | "expired";
+type HasFilter   = "all" | "yes" | "no";
+
 function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
   const [view, setView] = useState<View>("positions");
   const [search, setSearch] = useState("");
   const [side, setSide] = useState<"all" | OrderSide>("all");
   const [orderStatus, setOrderStatus] = useState<"open" | "closed" | "all">("open");
+  const [orderType, setOrderType] = useState<"all" | OrderType>("all");
+  const [detailStatus, setDetailStatus] = useState<DetailStatus>("all");
+  const [hasLimit, setHasLimit] = useState<HasFilter>("all");
+  const [hasStop, setHasStop] = useState<HasFilter>("all");
+  const [minQty, setMinQty] = useState("");
   const [showSubmit, setShowSubmit] = useState(false);
   const qc = useQueryClient();
 
@@ -360,7 +373,16 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
           {VIEWS.map((v) => (
             <button
               key={v.id}
-              onClick={() => setView(v.id)}
+              onClick={() => {
+                setView(v.id);
+                setSearch("");
+                setSide("all");
+                setOrderType("all");
+                setDetailStatus("all");
+                setHasLimit("all");
+                setHasStop("all");
+                setMinQty("");
+              }}
               className={`rounded-sm px-3 py-1.5 font-mono text-[.65rem] uppercase tracking-widest transition-colors ${
                 view === v.id ? "bg-accent text-bg-base" : "text-text-muted hover:text-text-primary"
               }`}
@@ -371,7 +393,7 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters — row 1: symbol search + side + status */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[180px]">
           <LuSearch className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-disabled" />
@@ -387,6 +409,7 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
         {/* Side filter — for orders + fills */}
         {view !== "positions" && (
           <FilterPills
+            label="Side"
             value={side}
             options={["all", "buy", "sell"] as const}
             onChange={(v) => setSide(v as "all" | OrderSide)}
@@ -396,26 +419,98 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
         {/* Status filter — orders only */}
         {view === "orders" && (
           <FilterPills
+            label="Status"
             value={orderStatus}
             options={["open", "closed", "all"] as const}
-            onChange={(v) => setOrderStatus(v as "open" | "closed" | "all")}
+            onChange={(v) => { setOrderStatus(v as "open" | "closed" | "all"); setDetailStatus("all"); }}
           />
         )}
 
-        {search && (
+        {(search || side !== "all" || orderStatus !== "open" || orderType !== "all" || detailStatus !== "all" || hasLimit !== "all" || hasStop !== "all" || minQty) && (
           <button
-            onClick={() => setSearch("")}
+            onClick={() => {
+              setSearch("");
+              setSide("all");
+              setOrderStatus("open");
+              setOrderType("all");
+              setDetailStatus("all");
+              setHasLimit("all");
+              setHasStop("all");
+              setMinQty("");
+            }}
             className="flex items-center gap-1 rounded-sm border border-border-default px-2 py-1.5 font-mono text-[.62rem] uppercase tracking-widest text-text-muted transition-colors hover:text-text-primary"
           >
-            <LuX className="h-3 w-3" /> Clear
+            <LuX className="h-3 w-3" /> Reset
           </button>
         )}
       </div>
 
+      {/* Filters — row 2: order-specific filters (type, detail-status, limit/stop, qty) */}
+      {view === "orders" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Order Type */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[.58rem] uppercase tracking-widest text-text-disabled">Type</span>
+            <div className="flex gap-1 rounded-sm border border-border-subtle bg-bg-elevated p-0.5">
+              {(["all", "market", "limit", "stop", "stop_limit", "trailing_stop"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setOrderType(t)}
+                  className={`rounded-sm px-2.5 py-1 font-mono text-[.58rem] uppercase tracking-widest transition-colors ${
+                    orderType === t ? "bg-accent text-bg-base" : "text-text-muted hover:text-text-primary"
+                  }`}
+                >
+                  {t === "stop_limit" ? "Stp Lmt" : t === "trailing_stop" ? "Trail" : t}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Detail Status — only when closed/all */}
+          {orderStatus !== "open" && (
+            <FilterPills
+              label="Result"
+              value={detailStatus}
+              options={["all", "filled", "canceled", "expired"] as const}
+              onChange={(v) => setDetailStatus(v as DetailStatus)}
+            />
+          )}
+
+          {/* Has Limit Price */}
+          <FilterPills
+            label="Limit"
+            value={hasLimit}
+            options={["all", "yes", "no"] as const}
+            onChange={(v) => setHasLimit(v as HasFilter)}
+          />
+
+          {/* Has Stop Price */}
+          <FilterPills
+            label="Stop"
+            value={hasStop}
+            options={["all", "yes", "no"] as const}
+            onChange={(v) => setHasStop(v as HasFilter)}
+          />
+
+          {/* Min Qty */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[.58rem] uppercase tracking-widest text-text-disabled">Min&nbsp;Qty</span>
+            <input
+              type="number"
+              min="0"
+              value={minQty}
+              onChange={(e) => setMinQty(e.target.value)}
+              placeholder="Any"
+              className="w-[72px] rounded-sm border border-border-default bg-bg-elevated py-1.5 px-2 font-mono text-[.68rem] text-text-primary placeholder:text-text-disabled focus:border-accent focus:outline-none"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border border-border-subtle bg-bg-surface p-4">
         {view === "positions" && <PositionsTable cid={cid} broker={broker} search={search} />}
-        {view === "orders"    && <OrdersTable    cid={cid} broker={broker} search={search} side={side} status={orderStatus} />}
+        {view === "orders"    && <OrdersTable    cid={cid} broker={broker} search={search} side={side} status={orderStatus} orderType={orderType} detailStatus={detailStatus} hasLimit={hasLimit} hasStop={hasStop} minQty={minQty} />}
         {view === "fills"     && <FillsTable     cid={cid} broker={broker} search={search} side={side} />}
       </div>
 
@@ -438,24 +533,31 @@ function FilterPills<T extends string>({
   value,
   options,
   onChange,
+  label,
 }: {
   value: T;
   options: readonly T[];
   onChange: (v: T) => void;
+  label?: string;
 }) {
   return (
-    <div className="flex gap-1 rounded-sm border border-border-subtle bg-bg-elevated p-0.5">
-      {options.map((o) => (
-        <button
-          key={o}
-          onClick={() => onChange(o)}
-          className={`rounded-sm px-3 py-1 font-mono text-[.62rem] uppercase tracking-widest transition-colors ${
-            value === o ? "bg-accent text-bg-base" : "text-text-muted hover:text-text-primary"
-          }`}
-        >
-          {o}
-        </button>
-      ))}
+    <div className="flex items-center gap-1.5">
+      {label && (
+        <span className="font-mono text-[.58rem] uppercase tracking-widest text-text-disabled">{label}</span>
+      )}
+      <div className="flex gap-1 rounded-sm border border-border-subtle bg-bg-elevated p-0.5">
+        {options.map((o) => (
+          <button
+            key={o}
+            onClick={() => onChange(o)}
+            className={`rounded-sm px-3 py-1 font-mono text-[.62rem] uppercase tracking-widest transition-colors ${
+              value === o ? "bg-accent text-bg-base" : "text-text-muted hover:text-text-primary"
+            }`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -588,12 +690,22 @@ function OrdersTable({
   search,
   side,
   status,
+  orderType,
+  detailStatus,
+  hasLimit,
+  hasStop,
+  minQty,
 }: {
   cid: string;
   broker: BrokerType;
   search: string;
   side: "all" | OrderSide;
   status: "open" | "closed" | "all";
+  orderType: "all" | OrderType;
+  detailStatus: DetailStatus;
+  hasLimit: HasFilter;
+  hasStop: HasFilter;
+  minQty: string;
 }) {
   const api = useBrokerApi(broker);
   const qc = useQueryClient();
@@ -617,23 +729,34 @@ function OrdersTable({
     },
   });
 
-  const statusColor = (s: string) =>
-    s === "filled" ? "text-bull"
-    : s === "canceled" || s === "expired" ? "text-bear"
-    : s === "new" || s === "accepted" || s === "partially_filled" ? "text-info"
-    : "text-text-muted";
+  const statusColor = (s: string) => {
+    const n = normStatus(s);
+    return n === "filled" ? "text-bull"
+      : n === "canceled" || n === "expired" ? "text-bear"
+      : n === "new" || n === "accepted" || n === "partially_filled" ? "text-info"
+      : "text-text-muted";
+  };
 
-  const rows = useMemo(
-    () =>
-      orders.filter((o) => {
-        if (search && !(o.symbol ?? "").toUpperCase().includes(search)) return false;
-        if (side !== "all" && normSide(o.side) !== side) return false;
-        return true;
-      }),
-    [orders, search, side],
-  );
+  const rows = useMemo(() => {
+    const minQtyNum = minQty !== "" ? parseFloat(minQty) : null;
+    return orders.filter((o) => {
+      if (search && !(o.symbol ?? "").toUpperCase().includes(search)) return false;
+      if (side !== "all" && normSide(o.side) !== side) return false;
+      if (orderType !== "all" && (o.order_type?.split(".").pop() ?? "") !== orderType) return false;
+      if (detailStatus !== "all" && normStatus(o.status) !== detailStatus) return false;
+      if (hasLimit === "yes" && !o.limit_price) return false;
+      if (hasLimit === "no" && !!o.limit_price) return false;
+      if (hasStop === "yes" && !o.stop_price) return false;
+      if (hasStop === "no" && !!o.stop_price) return false;
+      if (minQtyNum !== null) {
+        const qty = parseFloat(o.qty ?? o.notional ?? "0");
+        if (isNaN(qty) || qty < minQtyNum) return false;
+      }
+      return true;
+    });
+  }, [orders, search, side, orderType, detailStatus, hasLimit, hasStop, minQty]);
 
-  useEffect(() => { setPage(1); }, [search, side, status]);
+  useEffect(() => { setPage(1); }, [search, side, status, orderType, detailStatus, hasLimit, hasStop, minQty]);
 
   const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 

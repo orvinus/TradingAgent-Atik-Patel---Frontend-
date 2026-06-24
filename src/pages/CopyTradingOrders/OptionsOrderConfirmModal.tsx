@@ -12,7 +12,7 @@ import { InstrumentBadge } from "@/components/copy-trading/InstrumentBadge";
 import { PreSubmitChecksPanel } from "@/components/copy-trading/PreSubmitChecksPanel";
 import { EntryTypeToggle, MarketOrderBanner } from "@/components/copy-trading/EntryTypeBadge";
 import { formatExpiry, isMarketOrder, mapErrorCode } from "@/utils/copyTradingFormatters";
-import type { CopyOrder, OrderEdits, OrderPreview, PreSubmitCheck } from "@/types/copyValidator";
+import type { CopyOrder, OrderEdits, OrderPreview, PreSubmitCheck, SlippageResult } from "@/types/copyValidator";
 
 type TpMode = "single" | "multi";
 type MoveSlTo = "none" | "entry" | "breakeven";
@@ -233,6 +233,62 @@ function OptionsTpSection({ tp, onChange, busy }: { tp: TpState; onChange: (t: T
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Slippage info block (options / premium labels) ────────────────────────────
+
+function SlippageInfoBlock({
+  slippage,
+  orderType,
+}: {
+  slippage: SlippageResult;
+  orderType: "market" | "limit";
+}) {
+  const maxPct = slippage.maxPct;
+  const refPrice = slippage.reference_price ?? slippage.original_limit_price;
+  const submitPrice = slippage.adjusted_limit_price;
+
+  if (orderType === "market") {
+    return (
+      <div className="rounded-sm border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+        <p className="mb-1 font-mono text-[.56rem] uppercase tracking-widest text-amber-400">Slippage check</p>
+        <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[.62rem] text-text-secondary">
+          <span><span className="text-text-muted">Max slip:</span> {maxPct != null ? `${maxPct}%` : "0.5% (default)"}</span>
+          {refPrice != null && <span><span className="text-text-muted">Signal ref premium:</span> ${refPrice}</span>}
+        </div>
+        <p className="mt-1 font-mono text-[.58rem] text-amber-300">
+          Order rejected if market premium exceeds tolerance at submit.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-sm border border-purple-500/30 bg-purple-500/5 px-3 py-2.5">
+      <p className="mb-1 font-mono text-[.56rem] uppercase tracking-widest text-purple-400">
+        Slippage applied{maxPct != null ? ` · +${maxPct}%` : ""}
+      </p>
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[.62rem]">
+        {refPrice != null && (
+          <span>
+            <span className="text-text-muted">Signal premium:</span>{" "}
+            <span className="text-text-primary">${refPrice}</span>
+          </span>
+        )}
+        {submitPrice != null && (
+          <span>
+            <span className="text-text-muted">Submit limit:</span>{" "}
+            <span className="font-bold text-bull">${submitPrice}</span>
+          </span>
+        )}
+      </div>
+      {refPrice != null && submitPrice != null && (
+        <p className="mt-0.5 font-mono text-[.58rem] text-text-muted">
+          Limit widened by {maxPct != null ? `${maxPct}%` : "~0.5%"} to improve fill chance.
+        </p>
+      )}
     </div>
   );
 }
@@ -483,6 +539,14 @@ export default function OptionsOrderConfirmModal({
             {/* Multi-TP contracts breakdown */}
             {tpState.mode === "multi" && contractsNum != null && contractsNum > 0 && (
               <MultiTpLegBreakdown contracts={contractsNum} tp={tpState} />
+            )}
+
+            {/* Slippage info */}
+            {preview?.slippage?.enabled && (
+              <SlippageInfoBlock
+                slippage={preview.slippage}
+                orderType={orderTypeMode}
+              />
             )}
           </div>
         </div>
