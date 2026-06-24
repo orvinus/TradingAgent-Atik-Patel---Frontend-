@@ -68,6 +68,26 @@ export interface SlippageResult {
   adjusted_limit_price?: number | null;
 }
 
+export type SpreadMode = "off" | "auto" | "manual";
+
+export interface SpreadRule {
+  mode: SpreadMode;
+  maxPct?: number;
+}
+
+export interface SpreadResult {
+  enabled: boolean;
+  mode: SpreadMode;
+  maxPct?: number | null;
+  bid?: number | null;
+  ask?: number | null;
+  mid?: number | null;
+  spreadPct?: number | null;
+  crossSpread?: boolean | null;
+  limit_before_cross?: number | null;
+  crossed_limit_price?: number | null;
+}
+
 export interface ValidatorFields {
   entry?: SimpleFieldRule;
   sl?: PctFieldRule;
@@ -80,6 +100,7 @@ export interface ValidatorFields {
   side?: SimpleFieldRule;
   symbol?: SimpleFieldRule;
   slippage?: SlippageRule;
+  spread?: SpreadRule;
 }
 
 // Keys of ValidatorFields, used to drive the rules table generically.
@@ -292,7 +313,7 @@ export interface TpLevel {
 }
 
 export interface PreSubmitCheck {
-  name: "options_enabled" | "market_hours" | "price_sanity" | "tradability" | "buying_power" | "slippage" | string;
+  name: "options_enabled" | "market_hours" | "price_sanity" | "tradability" | "buying_power" | "slippage" | "spread" | string;
   ok: boolean;
   code?: string;
   message?: string;
@@ -305,6 +326,12 @@ export interface PreSubmitCheck {
   marketPrice?: number;
   adverseSlippagePct?: number;
   maxSlippagePct?: number;
+  bid?: number;
+  ask?: number;
+  spreadPct?: number;
+  maxSpreadPct?: number;
+  crossedLimit?: boolean;
+  crossedLimitPrice?: number;
 }
 
 export interface OrderPreview {
@@ -332,6 +359,7 @@ export interface OrderPreview {
   limit_price: number | null;
   signal_limit_price?: number | null;
   slippage?: SlippageResult | null;
+  spread?: SpreadResult | null;
   time_in_force?: string | null;
   trailing_stop?: { trailPct?: number; trailAmount?: number } | null;
 }
