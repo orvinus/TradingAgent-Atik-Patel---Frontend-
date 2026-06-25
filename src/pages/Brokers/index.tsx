@@ -247,13 +247,17 @@ function BrokerCard({
       {/* Icon + Name */}
       <div className="flex items-center gap-3">
         <div
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md border font-display text-lg font-bold ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md border font-display text-lg font-bold ${
             connected
               ? "border-accent-border bg-accent text-bg-base"
               : "border-border-default bg-bg-elevated text-accent"
           }`}
         >
-          {broker.symbol}
+          {broker.logo ? (
+            <img src={broker.logo} alt={broker.name} className="h-full w-full object-cover" />
+          ) : (
+            broker.symbol
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-display text-sm font-bold uppercase tracking-[.1em] text-text-primary">

@@ -143,8 +143,12 @@ export default function BrokerDetail() {
 
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border-subtle bg-bg-surface p-5">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-accent-border bg-accent font-display text-2xl font-bold text-bg-base">
-              {info.symbol}
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-accent-border bg-accent font-display text-2xl font-bold text-bg-base">
+              {info.logo ? (
+                <img src={info.logo} alt={info.name} className="h-full w-full object-cover" />
+              ) : (
+                info.symbol
+              )}
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
