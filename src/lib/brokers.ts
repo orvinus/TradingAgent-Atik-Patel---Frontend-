@@ -19,20 +19,19 @@ export interface BrokerInfo {
   name: string;
   description: string;
   symbol: string;
+  logo?: string;
   integrated: boolean;
 }
 
 export const BROKERS: BrokerInfo[] = [
-  { id: "alpaca",    name: "Alpaca",    description: "Commission-free stocks + API access.",         symbol: "α", integrated: true  },
+  { id: "alpaca",    name: "Alpaca",    description: "Commission-free stocks + API access.",         symbol: "α", logo: "/alpaca-logo.png", integrated: true  },
   { id: "tradier",   name: "Tradier",   description: "Options, equities, and API trading.",           symbol: "T", integrated: true  },
   { id: "binance",   name: "Binance",   description: "Crypto spot trading with HMAC & Ed25519.",     symbol: "B", integrated: true  },
   { id: "public",    name: "Public",    description: "Stocks, options, crypto & bonds.",              symbol: "P", integrated: true  },
-  { id: "finance",   name: "Finance",   description: "Secure financial account integration.",         symbol: "₣", integrated: false },
   { id: "robinhood", name: "Robinhood", description: "Commission-free crypto investing platform.",    symbol: "R", integrated: true  },
-  { id: "schwab",    name: "Schwab",    description: "Professional investing and portfolio mgmt.",    symbol: "S", integrated: false },
   { id: "kraken",    name: "Kraken",    description: "Advanced cryptocurrency trading.",              symbol: "K", integrated: true  },
   { id: "coinbase",  name: "Coinbase",  description: "Trusted crypto investing and exchange.",        symbol: "C", integrated: true  },
-  { id: "gemini",    name: "Gemini",    description: "Regulated crypto investing and exchange.",      symbol: "G", integrated: false },
+  { id: "mt5",       name: "MT5",       description: "MetaTrader 5 multi-asset trading platform.",   symbol: "5", integrated: false },
 ];
 
 export function getBrokerInfo(brokerId: string): BrokerInfo | undefined {
