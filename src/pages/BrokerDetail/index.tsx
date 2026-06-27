@@ -32,7 +32,7 @@ import type {
 } from "@/types/broker";
 
 const INTEGRATED_BROKERS = new Set<BrokerType>([
-  "alpaca", "tradier", "binance", "coinbase", "kraken", "public", "robinhood",
+  "alpaca", "tradier", "binance", "coinbase", "kraken", "public", "robinhood", "mt5",
 ]);
 
 function isBrokerType(v: string | undefined): v is BrokerType {

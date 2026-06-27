@@ -189,7 +189,31 @@ export const qk = {
   binanceBars:       (cid: string, symbol: string, days: number) =>
                                              ["binance", cid, "bars", symbol, days] as const,
 
-  // ── Copy Trading (Telegram) ────────────────────────────────────────────
+  // ── MT5 connections
+  mt5Connections:    ()                   => ["mt5", "connections"]      as const,
+
+  // ── Per-connection MT5 data
+  mt5Account:        (cid: string)        => ["mt5", cid, "account"]     as const,
+  mt5Clock:          (cid: string)        => ["mt5", cid, "clock"]       as const,
+  mt5Positions:      (cid: string)        => ["mt5", cid, "positions"]   as const,
+  mt5Capabilities:   (cid: string)        => ["mt5", cid, "capabilities"] as const,
+  mt5History:        (cid: string, period: string, tf: string) =>
+                                             ["mt5", cid, "history", period, tf] as const,
+
+  // ── MT5 orders & fills
+  mt5Orders:         (cid: string, status?: string) =>
+                                             ["mt5", cid, "orders", status ?? "open"] as const,
+  mt5Order:          (cid: string, oid: string) =>
+                                             ["mt5", cid, "orders", oid] as const,
+  mt5Fills:          (cid: string)        => ["mt5", cid, "fills"]       as const,
+
+  // ── MT5 market data
+  mt5Quote:          (cid: string, symbol: string) =>
+                                             ["mt5", cid, "quote", symbol] as const,
+  mt5Bars:           (cid: string, symbol: string, days: number) =>
+                                             ["mt5", cid, "bars", symbol, days] as const,
+
+  // ── Copy Trading (Telegram)────────────────────────────────────────────
   copyTradingConfig:        ()                           => ["copy-trading", "config"]             as const,
   copyTradingStatus:        ()                           => ["copy-trading", "status"]             as const,
   copyTradingSources:       ()                           => ["copy-trading", "sources"]            as const,

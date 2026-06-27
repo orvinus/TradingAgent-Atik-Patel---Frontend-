@@ -12,6 +12,7 @@ import { coinbaseApi } from "@/api/endpoints/coinbase";
 import { krakenApi } from "@/api/endpoints/kraken";
 import { publicApi } from "@/api/endpoints/public";
 import { robinhoodApi } from "@/api/endpoints/robinhood";
+import { mt5Api } from "@/api/endpoints/mt5";
 import { toast } from "@/components/ui/Toast";
 import { LuLoader, LuCheck, LuX } from "react-icons/lu";
 import type { BrokerEnvironment, BrokerType } from "@/types/broker";
@@ -74,7 +75,7 @@ export function ConnectionModal({
                 ? (["live"] as const)
                 : broker === "binance"
                 ? (["testnet", "live"] as const)
-                : (["paper", "live"] as const)
+                : (["paper", "live"] as const) // alpaca, tradier, mt5
               ).map((e) => (
                 <button
                   key={e}
@@ -117,7 +118,9 @@ export function ConnectionModal({
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               placeholder={
-                broker === "tradier" ? "My Tradier Sandbox" : "My Alpaca Paper"
+                broker === "tradier" ? "My Tradier Sandbox"
+                : broker === "mt5" ? "My MT5 Demo"
+                : "My Alpaca Paper"
               }
               className="w-full rounded-sm border border-border-default bg-bg-elevated px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-disabled focus:border-accent focus:outline-none"
             />
@@ -850,6 +853,139 @@ export function CreateRobinhoodModal({
         />
         <p className="mt-1 font-mono text-[.6rem] text-text-disabled">
           Ed25519 PEM from Robinhood API settings. Stored encrypted; never returned.
+        </p>
+      </div>
+    </ConnectionModal>
+  );
+}
+
+// ── MT5 Connection Modal ──────────────────────────────────────────────────────
+
+export function CreateMT5Modal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [env, setEnv] = useState<BrokerEnvironment>("paper");
+  const [displayName, setDisplayName] = useState("");
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [server, setServer] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+
+  const createMut = useMutation({
+    mutationFn: () =>
+      mt5Api.createConnection({
+        environment: env as "paper" | "live",
+        ...(displayName ? { display_name: displayName } : {}),
+        login,
+        password,
+        server,
+        confirm_secret_storage: true,
+      }),
+    onSuccess: () => {
+      setPassword("");
+      toast.success("MT5 connection created.");
+      onCreated();
+    },
+    onError: (err) => {
+      const data = axios.isAxiosError(err) ? err.response?.data : null;
+      const msg =
+        (data && typeof data === "object" && "detail" in data && typeof (data as { detail?: { message?: string } }).detail === "object"
+          ? (data as { detail: { message?: string } }).detail?.message
+          : null) ??
+        (data && typeof data === "object" && "message" in data
+          ? (data as { message?: string }).message
+          : null) ??
+        "Failed to create MT5 connection.";
+      toast.error(msg);
+    },
+  });
+
+  const canSubmit =
+    login.trim().length > 0 &&
+    password.trim().length > 0 &&
+    server.trim().length > 0 &&
+    confirmed &&
+    !createMut.isPending;
+
+  return (
+    <ConnectionModal
+      title="Add MetaTrader 5 Connection"
+      broker="mt5"
+      env={env}
+      setEnv={setEnv}
+      displayName={displayName}
+      setDisplayName={setDisplayName}
+      confirmed={confirmed}
+      setConfirmed={setConfirmed}
+      isPending={createMut.isPending}
+      canSubmit={canSubmit}
+      onClose={onClose}
+      onSubmit={() => createMut.mutate()}
+    >
+      {/* MT5 Login (account number) */}
+      <div>
+        <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+          MT5 Login (Account Number) <span className="text-bear">*</span>
+        </label>
+        <input
+          type="text"
+          value={login}
+          onChange={(e) => setLogin(e.target.value)}
+          placeholder="5000123456"
+          autoComplete="off"
+          className="w-full rounded-sm border border-border-default bg-bg-elevated px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-disabled focus:border-accent focus:outline-none"
+        />
+        <p className="mt-1 font-mono text-[.6rem] text-text-disabled">
+          Your MT5 numeric account login provided by your broker.
+        </p>
+      </div>
+
+      {/* Password */}
+      <div>
+        <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+          Password <span className="text-bear">*</span>
+        </label>
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••••••"
+          autoComplete="new-password"
+          className="w-full rounded-sm border border-border-default bg-bg-elevated px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-disabled focus:border-accent focus:outline-none"
+        />
+        <p className="mt-1 font-mono text-[.6rem] text-text-disabled">
+          Stored encrypted one-time. Never returned after connection is created.
+        </p>
+      </div>
+
+      {/* Server */}
+      <div>
+        <label className="mb-1.5 block font-mono text-[.65rem] uppercase tracking-widest text-text-muted">
+          Server <span className="text-bear">*</span>
+        </label>
+        <input
+          type="text"
+          value={server}
+          onChange={(e) => setServer(e.target.value)}
+          placeholder="MetaQuotes-Demo"
+          autoComplete="off"
+          className="w-full rounded-sm border border-border-default bg-bg-elevated px-3 py-2 font-mono text-sm text-text-primary placeholder:text-text-disabled focus:border-accent focus:outline-none"
+        />
+        <p className="mt-1 font-mono text-[.6rem] text-text-disabled">
+          MT5 server name — shown in the MT5 terminal login screen (e.g. MetaQuotes-Demo).
+        </p>
+      </div>
+
+      {/* MT5-specific info */}
+      <div className="rounded-sm border border-border-subtle bg-bg-elevated px-3 py-2.5">
+        <p className="font-mono text-[.6rem] leading-relaxed text-text-disabled">
+          ⓘ MT5 supports FX (EURUSD, GBPUSD, USDJPY), commodities (XAUUSD), and CFDs.
+          Orders use <strong className="text-text-secondary">lots</strong> (min 0.01) — no dollar/notional amounts.
+          Options and multi-leg strategies are not supported.
         </p>
       </div>
     </ConnectionModal>
