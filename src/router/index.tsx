@@ -30,6 +30,8 @@ const CopyTradingDiscordReturn    = lazy(() => import("@/pages/CopyTradingDiscor
 const CopyTradingValidator        = lazy(() => import("@/pages/CopyTradingValidator/index"));
 const CopyTradingMissingFields    = lazy(() => import("@/pages/CopyTradingMissingFields/index"));
 const CopyTradingOrders           = lazy(() => import("@/pages/CopyTradingOrders/index"));
+const CopyTradingDiscordAccount   = lazy(() => import("@/pages/CopyTradingDiscordAccount/index"));
+const CopyTradingX                = lazy(() => import("@/pages/CopyTradingX/index"));
 
 const Login           = lazy(() => import("@/pages/Login/index"));
 const Signup          = lazy(() => import("@/pages/Signup/index"));
@@ -158,6 +160,8 @@ export const router = createBrowserRouter([
       { path: "/copy-trading/connections/telegram", element: <Page component={CopyTradingTelegram}       /> },
       { path: "/copy-trading/connections/discord",  element: <Page component={CopyTradingDiscord}        /> },
       { path: "/copy-trading/discord",              element: <Page component={CopyTradingDiscordReturn}  /> },
+      { path: "/copy-trading/connections/discord-account", element: <Page component={CopyTradingDiscordAccount} /> },
+      { path: "/copy-trading/connections/x",            element: <Page component={CopyTradingX}              /> },
       { path: "/copy-trading/validator",            element: <Page component={CopyTradingValidator}      /> },
       { path: "/copy-trading/missing-fields",       element: <Page component={CopyTradingMissingFields}  /> },
       { path: "/copy-trading/orders",               element: <Page component={CopyTradingOrders}         /> },
