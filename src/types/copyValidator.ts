@@ -3,6 +3,18 @@
 // Types for the Copy Trading Validator (risk / limits) and Order execution.
 // Backend contract: /api/v1/copy-trading/validator/* and /copy-trading/orders/*
 
+// ── Symbol filter ─────────────────────────────────────────────────────────────
+export interface SymbolFilter {
+  include?: string;
+  exclude?: string;
+}
+
+// ── Message phrase filter ─────────────────────────────────────────────────────
+export interface MessageFilter {
+  include?: string;
+  exclude?: string;
+}
+
 // ── Core enums ──────────────────────────────────────────────────────────────
 export type ExecutionMode = "auto" | "manual";
 export type FieldMode = "auto" | "manual";
@@ -10,10 +22,10 @@ export type OnViolation = "reject" | "clamp";
 export type OrderTypeValue = "market" | "limit" | "stop" | "stop_limit";
 
 // ── Instrument / asset types (NEW) ─────────────────────────────────────────
-export type InstrumentProfile = "equity" | "options" | "crypto" | "unsupported";
-export type SizeUnit = "shares" | "contracts" | "units";
+export type InstrumentProfile = "equity" | "commodity" | "options" | "crypto" | "unsupported";
+export type SizeUnit = "shares" | "lots" | "contracts" | "units";
 export type PriceBasis = "premium" | "spot" | "underlying" | null;
-export type ValidatorProfile = "equity" | "options";
+export type ValidatorProfile = "equity" | "commodity" | "crypto" | "options";
 
 export type Platform = "telegram" | "discord";
 
@@ -53,16 +65,24 @@ export interface TrailingStopRule {
 }
 
 export type SlippageMode = "off" | "auto" | "manual";
+export type ToleranceUnit = "pct" | "pips" | "points";
 
 export interface SlippageRule {
   mode: SlippageMode;
+  unit?: ToleranceUnit;
   maxPct?: number;
+  maxPips?: number;
+  maxPoints?: number;
 }
 
 export interface SlippageResult {
   enabled: boolean;
   mode: SlippageMode;
+  unit?: ToleranceUnit | null;
   maxPct?: number | null;
+  maxPips?: number | null;
+  maxPoints?: number | null;
+  pipSize?: number | null;
   reference_price?: number | null;
   original_limit_price?: number | null;
   adjusted_limit_price?: number | null;
@@ -72,13 +92,20 @@ export type SpreadMode = "off" | "auto" | "manual";
 
 export interface SpreadRule {
   mode: SpreadMode;
+  unit?: ToleranceUnit;
   maxPct?: number;
+  maxPips?: number;
+  maxPoints?: number;
 }
 
 export interface SpreadResult {
   enabled: boolean;
   mode: SpreadMode;
+  unit?: ToleranceUnit | null;
   maxPct?: number | null;
+  maxPips?: number | null;
+  maxPoints?: number | null;
+  pipSize?: number | null;
   bid?: number | null;
   ask?: number | null;
   mid?: number | null;
@@ -124,6 +151,8 @@ export interface ProfileConfig {
   onViolation?: OnViolation;
   fields?: ValidatorFields;
   missingFields?: ProfileMissingFields;
+  symbolFilter?: SymbolFilter;
+  messageFilter?: MessageFilter;
 }
 
 // ── Config (read + write share this shape) ────────────────────────────────────
@@ -133,6 +162,8 @@ export interface ValidatorConfigBody {
   fields?: ValidatorFields;
   profiles?: {
     equity?: ProfileConfig;
+    commodity?: ProfileConfig;
+    crypto?: ProfileConfig;
     options?: ProfileConfig;
   };
 }
@@ -145,6 +176,8 @@ export interface NormalizedValidatorConfig {
   executionMode: ExecutionMode;
   onViolation: OnViolation;
   fields: ValidatorFields;
+  symbolFilter?: SymbolFilter;
+  messageFilter?: MessageFilter;
   profiles?: ValidatorConfigBody["profiles"];
 }
 
@@ -155,6 +188,8 @@ export interface ValidatorConfigResponse {
   effectiveConfig?: ProfileConfig;
   profiles?: {
     equity?: ProfileConfig;
+    commodity?: ProfileConfig;
+    crypto?: ProfileConfig;
     options?: ProfileConfig;
   };
 }
@@ -180,6 +215,12 @@ export interface ValidateResult {
   violations: Violation[];
   summary?: string;
   preSubmitChecks?: PreSubmitCheck[];
+  messageFilter?: {
+    messageText?: string | null;
+    matchedPhrase?: string | null;
+    include?: string[];
+    exclude?: string[];
+  };
   missingFields?: {
     applied: string[];
     rejected: string[];
@@ -217,6 +258,9 @@ export interface ValidatorOptions {
   orderTypes?: OrderTypeValue[];
   executionModes?: ExecutionMode[];
   onViolation?: OnViolation[];
+  messageFilter?: {
+    suggestedExcludeDefaults?: string[];
+  };
 }
 
 // ── Per-source override summaries (GET /config/sources) ───────────────────────
@@ -228,7 +272,7 @@ export interface SourceConfigSummary {
   config?: ValidatorConfigBody;
 }
 
-// Detailed per-source GET response (GET /config/sources/:platform/:sourceId?profile=equity|options)
+// Detailed per-source GET response (GET /config/sources/:platform/:sourceId?profile=equity|commodity|crypto|options)
 export interface SourceConfigDetailResponse {
   config: ValidatorConfig | null;
   inheritsFromGlobal: boolean;
@@ -238,6 +282,8 @@ export interface SourceConfigDetailResponse {
   sourceOverride?: {
     profiles?: {
       equity?: ProfileConfig;
+      commodity?: ProfileConfig;
+      crypto?: ProfileConfig;
       options?: ProfileConfig;
     };
     fields?: ValidatorFields | null;
@@ -245,6 +291,8 @@ export interface SourceConfigDetailResponse {
   };
   profiles?: {
     equity?: ProfileConfig;
+    commodity?: ProfileConfig;
+    crypto?: ProfileConfig;
     options?: ProfileConfig;
   };
 }

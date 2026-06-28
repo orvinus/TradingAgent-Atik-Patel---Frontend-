@@ -1,19 +1,23 @@
 // src/components/copy-trading/ProfileSettingsTabs.tsx
-// Reusable tab shell for Equity & Crypto vs Options profile switching.
+// Reusable tab shell for four asset-class profile tabs.
+import type { ValidatorProfile } from "@/types/copyValidator";
 
 interface Tab {
-  id: string;
+  id: ValidatorProfile;
   label: string;
+  dotColor: string;
 }
 
 const TABS: Tab[] = [
-  { id: "equity", label: "Equity & Crypto" },
-  { id: "options", label: "Options" },
+  { id: "equity",    label: "Equity",             dotColor: "bg-blue-400" },
+  { id: "commodity", label: "Commodity",           dotColor: "bg-amber-400" },
+  { id: "crypto",    label: "Crypto",              dotColor: "bg-orange-400" },
+  { id: "options",   label: "Futures & Options",   dotColor: "bg-purple-400" },
 ];
 
 interface Props {
-  activeTab: "equity" | "options";
-  onTabChange: (tab: "equity" | "options") => void;
+  activeTab: ValidatorProfile;
+  onTabChange: (tab: ValidatorProfile) => void;
   children: React.ReactNode;
 }
 
@@ -27,24 +31,17 @@ export function ProfileSettingsTabs({ activeTab, onTabChange, children }: Props)
           return (
             <button
               key={tab.id}
-              onClick={() => onTabChange(tab.id as "equity" | "options")}
+              onClick={() => onTabChange(tab.id)}
               className={`px-4 py-2.5 font-mono text-[.65rem] font-bold uppercase tracking-widest transition-colors ${
                 active
                   ? "border-b-2 border-accent text-accent"
                   : "text-text-muted hover:text-text-secondary"
               }`}
             >
-              {tab.id === "options" ? (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
-                  {tab.label}
-                </span>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
-                  {tab.label}
-                </span>
-              )}
+              <span className="flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${tab.dotColor}`} />
+                {tab.label}
+              </span>
             </button>
           );
         })}

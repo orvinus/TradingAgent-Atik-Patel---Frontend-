@@ -2,6 +2,7 @@
 import { apiClient } from "@/api/client";
 import type {
   MissingFieldsConfig,
+  MissingFieldsFullConfig,
   MissingFieldsOptions,
   MissingFieldsPreviewResponse,
   MissingFieldsSourceConfig,
@@ -28,10 +29,23 @@ export const missingFieldsApi = {
     return (d?.missingFields ?? d) as MissingFieldsConfig;
   },
 
+  getFullConfig: async (): Promise<MissingFieldsFullConfig> => {
+    const { data } = await apiClient.get(`${BASE}/config`);
+    return unwrap<MissingFieldsFullConfig>(data);
+  },
+
   updateConfig: async (missingFields: MissingFieldsConfig): Promise<MissingFieldsConfig> => {
     const { data } = await apiClient.put(`${BASE}/config`, { missingFields });
     const d = unwrap<{ missingFields?: MissingFieldsConfig } & MissingFieldsConfig>(data);
     return (d?.missingFields ?? d ?? missingFields) as MissingFieldsConfig;
+  },
+
+  updateCommodityConfig: async (commodityMissingFields: MissingFieldsConfig): Promise<void> => {
+    await apiClient.put(`${BASE}/config`, { commodityMissingFields });
+  },
+
+  updateCryptoConfig: async (cryptoMissingFields: MissingFieldsConfig): Promise<void> => {
+    await apiClient.put(`${BASE}/config`, { cryptoMissingFields });
   },
 
   preview: async (body: {

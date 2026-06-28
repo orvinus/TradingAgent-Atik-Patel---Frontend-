@@ -240,6 +240,7 @@ export const qk = {
   // ── Copy Trading Missing Fields ────────────────────────────────────────────
   missingFieldsOptions:     ()                           => ["missing-fields", "options"]          as const,
   missingFieldsConfig:      ()                           => ["missing-fields", "config"]           as const,
+  missingFieldsFullConfig:  ()                           => ["missing-fields", "config", "full"]   as const,
   missingFieldsSource:      (platform: string, sourceId: string) =>
                                                             ["missing-fields", "sources", platform, sourceId] as const,
 

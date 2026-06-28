@@ -15,6 +15,7 @@ import type {
   SourceConfigSummary,
   ValidatorConfigBody,
   ValidatorOptions,
+  ValidatorProfile,
 } from "@/types/copyValidator";
 import ValidatorForm, { normalizeConfig } from "./ValidatorForm";
 import OptionsValidatorForm, { normalizeOptionsConfig } from "./OptionsValidatorForm";
@@ -35,17 +36,34 @@ function apiErr(err: unknown): string {
 // ── Badge helpers ─────────────────────────────────────────────────────────────
 
 function getBadgeInfo(summary?: SourceConfigSummary) {
-  if (!summary?.hasCustomRules) return { equityCustom: false, optionsCustom: false };
+  if (!summary?.hasCustomRules) return { equity: false, commodity: false, crypto: false, options: false };
   const c = summary.config;
   return {
-    equityCustom: !!(c?.profiles?.equity || c?.fields),
-    optionsCustom: !!c?.profiles?.options,
+    equity: !!(c?.profiles?.equity || c?.fields),
+    commodity: !!c?.profiles?.commodity,
+    crypto: !!c?.profiles?.crypto,
+    options: !!c?.profiles?.options,
   };
 }
 
+const PROFILE_BADGE_STYLES: Record<ValidatorProfile, string> = {
+  equity:    "border-blue-500/40 bg-blue-500/10 text-blue-400",
+  commodity: "border-amber-500/40 bg-amber-500/10 text-amber-400",
+  crypto:    "border-orange-500/40 bg-orange-500/10 text-orange-400",
+  options:   "border-purple-500/40 bg-purple-500/10 text-purple-400",
+};
+
+const PROFILE_LABELS: Record<ValidatorProfile, string> = {
+  equity:    "Equity",
+  commodity: "Commodity",
+  crypto:    "Crypto",
+  options:   "F&O",
+};
+
 function ProfileBadge({ summary }: { summary?: SourceConfigSummary | undefined }) {
-  const { equityCustom, optionsCustom } = getBadgeInfo(summary);
-  if (!equityCustom && !optionsCustom) {
+  const badges = getBadgeInfo(summary);
+  const active = (Object.keys(badges) as ValidatorProfile[]).filter((p) => badges[p]);
+  if (active.length === 0) {
     return (
       <span className="rounded-sm border border-border-subtle px-2 py-0.5 font-mono text-[.54rem] uppercase tracking-widest text-text-muted">
         Global default
@@ -54,16 +72,14 @@ function ProfileBadge({ summary }: { summary?: SourceConfigSummary | undefined }
   }
   return (
     <span className="flex items-center gap-1">
-      {equityCustom && (
-        <span className="rounded-sm border border-blue-500/40 bg-blue-500/10 px-2 py-0.5 font-mono text-[.54rem] uppercase tracking-widest text-blue-400">
-          {optionsCustom ? "Equity" : "Custom (Equity)"}
+      {active.map((p) => (
+        <span
+          key={p}
+          className={`rounded-sm border px-2 py-0.5 font-mono text-[.54rem] uppercase tracking-widest ${PROFILE_BADGE_STYLES[p]}`}
+        >
+          {PROFILE_LABELS[p]}
         </span>
-      )}
-      {optionsCustom && (
-        <span className="rounded-sm border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 font-mono text-[.54rem] uppercase tracking-widest text-purple-400">
-          {equityCustom ? "Options" : "Custom (Options)"}
-        </span>
-      )}
+      ))}
     </span>
   );
 }
@@ -99,7 +115,7 @@ export default function SourceOverrides({ options }: { options?: ValidatorOption
     <div className="rounded-lg border border-border-subtle bg-bg-surface p-5 shadow-card">
       <h2 className="mb-1 font-display font-bold text-text-primary">Per-channel overrides</h2>
       <p className="mb-4 font-mono text-[.63rem] text-text-muted">
-        Apply stricter (or looser) rules to a single channel for Equity and/or Options independently.
+        Apply stricter (or looser) rules to a single channel, independently per asset class.
       </p>
 
       {loading ? (
@@ -166,15 +182,25 @@ function OverrideModal({
   const hasCustomRules = summary?.hasCustomRules ?? false;
 
   const [useCustom, setUseCustom] = useState(hasCustomRules);
-  const [activeTab, setActiveTab] = useState<"equity" | "options">("equity");
+  const [activeTab, setActiveTab] = useState<ValidatorProfile>("equity");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   const [equityConfig, setEquityConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
+  const [commodityConfig, setCommodityConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
+  const [cryptoConfig, setCryptoConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
   const [optionsConfig, setOptionsConfig] = useState<Required<ProfileConfig>>(normalizeOptionsConfig());
 
   const equityDetailQ = useQuery({
     queryKey: qk.copyValidatorSourceProfile(row.platform, row.sourceId, "equity"),
     queryFn: () => copyValidatorApi.getSourceConfigDetail(row.platform, row.sourceId, "equity"),
+  });
+  const commodityDetailQ = useQuery({
+    queryKey: qk.copyValidatorSourceProfile(row.platform, row.sourceId, "commodity"),
+    queryFn: () => copyValidatorApi.getSourceConfigDetail(row.platform, row.sourceId, "commodity"),
+  });
+  const cryptoDetailQ = useQuery({
+    queryKey: qk.copyValidatorSourceProfile(row.platform, row.sourceId, "crypto"),
+    queryFn: () => copyValidatorApi.getSourceConfigDetail(row.platform, row.sourceId, "crypto"),
   });
   const optionsDetailQ = useQuery({
     queryKey: qk.copyValidatorSourceProfile(row.platform, row.sourceId, "options"),
@@ -186,13 +212,22 @@ function OverrideModal({
   }, [equityDetailQ.data]);
 
   useEffect(() => {
+    if (commodityDetailQ.data) setCommodityConfig(normalizeConfig(commodityDetailQ.data.effectiveConfig));
+  }, [commodityDetailQ.data]);
+
+  useEffect(() => {
+    if (cryptoDetailQ.data) setCryptoConfig(normalizeConfig(cryptoDetailQ.data.effectiveConfig));
+  }, [cryptoDetailQ.data]);
+
+  useEffect(() => {
     if (optionsDetailQ.data) setOptionsConfig(normalizeOptionsConfig(optionsDetailQ.data.effectiveConfig));
   }, [optionsDetailQ.data]);
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: qk.copyValidatorSources() });
-    qc.invalidateQueries({ queryKey: qk.copyValidatorSourceProfile(row.platform, row.sourceId, "equity") });
-    qc.invalidateQueries({ queryKey: qk.copyValidatorSourceProfile(row.platform, row.sourceId, "options") });
+    (["equity", "commodity", "crypto", "options"] as ValidatorProfile[]).forEach((p) =>
+      qc.invalidateQueries({ queryKey: qk.copyValidatorSourceProfile(row.platform, row.sourceId, p) }),
+    );
   };
 
   const saveMut = useMutation({
@@ -229,12 +264,29 @@ function OverrideModal({
       toast.error(`Equity: ${equityErrors[0] ?? "Fix validation errors"}`);
       return;
     }
+    const commodityErrors = validateConfig(commodityConfig);
+    if (commodityErrors.length) {
+      setActiveTab("commodity");
+      toast.error(`Commodity: ${commodityErrors[0] ?? "Fix validation errors"}`);
+      return;
+    }
+    const cryptoErrors = validateConfig(cryptoConfig);
+    if (cryptoErrors.length) {
+      setActiveTab("crypto");
+      toast.error(`Crypto: ${cryptoErrors[0] ?? "Fix validation errors"}`);
+      return;
+    }
 
-    const equityBody = serializeConfig(equityConfig);
-    const equityProfile: ProfileConfig = {};
-    if (equityBody.executionMode != null) equityProfile.executionMode = equityBody.executionMode;
-    if (equityBody.onViolation != null) equityProfile.onViolation = equityBody.onViolation;
-    if (equityBody.fields != null) equityProfile.fields = equityBody.fields;
+    const toProfileConfig = (cfg: NormalizedValidatorConfig): ProfileConfig => {
+      const b = serializeConfig(cfg);
+      const p: ProfileConfig = {};
+      if (b.executionMode != null) p.executionMode = b.executionMode;
+      if (b.onViolation != null) p.onViolation = b.onViolation;
+      if (b.fields != null) p.fields = b.fields;
+      if (cfg.symbolFilter && (cfg.symbolFilter.include || cfg.symbolFilter.exclude)) p.symbolFilter = cfg.symbolFilter;
+      if (cfg.messageFilter && (cfg.messageFilter.include || cfg.messageFilter.exclude)) p.messageFilter = cfg.messageFilter;
+      return p;
+    };
 
     const optionsProfile: ProfileConfig = {
       executionMode: optionsConfig.executionMode,
@@ -245,12 +297,30 @@ function OverrideModal({
     }
     const mf = optionsConfig.missingFields;
     if (mf && Object.keys(mf).length > 0) optionsProfile.missingFields = mf;
+    const sf = optionsConfig.symbolFilter;
+    if (sf && (sf.include || sf.exclude)) optionsProfile.symbolFilter = sf;
+    const msgf = optionsConfig.messageFilter;
+    if (msgf && (msgf.include || msgf.exclude)) optionsProfile.messageFilter = msgf;
 
-    saveMut.mutate({ profiles: { equity: equityProfile, options: optionsProfile } });
+    saveMut.mutate({
+      profiles: {
+        equity: toProfileConfig(equityConfig),
+        commodity: toProfileConfig(commodityConfig),
+        crypto: toProfileConfig(cryptoConfig),
+        options: optionsProfile,
+      },
+    });
   };
 
   const busy = saveMut.isPending || deleteMut.isPending;
-  const loading = equityDetailQ.isLoading || optionsDetailQ.isLoading;
+  const loading = equityDetailQ.isLoading || commodityDetailQ.isLoading || cryptoDetailQ.isLoading || optionsDetailQ.isLoading;
+
+  const globalForTab = {
+    equity: equityDetailQ.data?.globalEffectiveConfig,
+    commodity: commodityDetailQ.data?.globalEffectiveConfig,
+    crypto: cryptoDetailQ.data?.globalEffectiveConfig,
+    options: optionsDetailQ.data?.globalEffectiveConfig,
+  }[activeTab];
 
   return (
     <div
@@ -337,33 +407,66 @@ function OverrideModal({
             </div>
           ) : !useCustom ? (
             <div className="rounded-sm border border-border-subtle bg-bg-elevated px-3 py-2 font-mono text-[.63rem] text-text-muted">
-              This channel uses your <strong>global default rules</strong> for both Equity and Options signals.
+              This channel uses your <strong>global default rules</strong> for all asset classes.
               Check the box above to set channel-specific overrides.
             </div>
           ) : (
             <>
               <div className="mb-4 rounded-sm border border-border-subtle bg-bg-elevated px-3 py-2.5">
                 <p className="font-mono text-[.6rem] text-text-muted">
-                  <strong className="text-text-secondary">Equity</strong> rules apply to stock and crypto signals from this channel.{" "}
-                  <strong className="text-text-secondary">Options</strong> rules apply to options signals.
-                  Changing one tab doesn't affect the other profile.
+                  Each profile tab is saved independently. Changing Equity rules does not affect Commodity, Crypto, or Options.
                 </p>
               </div>
 
               <ProfileSettingsTabs activeTab={activeTab} onTabChange={setActiveTab}>
-                {activeTab === "equity" ? (
-                  <ValidatorForm config={equityConfig} onChange={setEquityConfig} options={options} />
+                {activeTab === "options" ? (
+                  <OptionsValidatorForm
+                    config={optionsConfig}
+                    onChange={setOptionsConfig}
+                    {...(options?.messageFilter?.suggestedExcludeDefaults != null
+                      ? { suggestedMessagePhrases: options.messageFilter.suggestedExcludeDefaults }
+                      : {})}
+                  />
+                ) : activeTab === "commodity" ? (
+                  <ValidatorForm
+                    config={commodityConfig}
+                    onChange={setCommodityConfig}
+                    options={options}
+                    profile="commodity"
+                    {...(options?.messageFilter?.suggestedExcludeDefaults != null
+                      ? { suggestedMessagePhrases: options.messageFilter.suggestedExcludeDefaults }
+                      : {})}
+                  />
+                ) : activeTab === "crypto" ? (
+                  <ValidatorForm
+                    config={cryptoConfig}
+                    onChange={setCryptoConfig}
+                    options={options}
+                    profile="crypto"
+                    {...(options?.messageFilter?.suggestedExcludeDefaults != null
+                      ? { suggestedMessagePhrases: options.messageFilter.suggestedExcludeDefaults }
+                      : {})}
+                  />
                 ) : (
-                  <OptionsValidatorForm config={optionsConfig} onChange={setOptionsConfig} />
+                  <ValidatorForm
+                    config={equityConfig}
+                    onChange={setEquityConfig}
+                    options={options}
+                    profile="equity"
+                    {...(options?.messageFilter?.suggestedExcludeDefaults != null
+                      ? { suggestedMessagePhrases: options.messageFilter.suggestedExcludeDefaults }
+                      : {})}
+                  />
                 )}
               </ProfileSettingsTabs>
 
               <CompareSection
                 activeTab={activeTab}
                 equityConfig={equityConfig}
+                commodityConfig={commodityConfig}
+                cryptoConfig={cryptoConfig}
                 optionsConfig={optionsConfig}
-                globalEquity={equityDetailQ.data?.globalEffectiveConfig}
-                globalOptions={optionsDetailQ.data?.globalEffectiveConfig}
+                {...(globalForTab != null ? { global: globalForTab } : {})}
               />
             </>
           )}
@@ -396,9 +499,7 @@ function OverrideModal({
 
 type ComparePair = { label: string; global: string; channel: string };
 
-function fmtExecMode(v?: string) {
-  return v === "manual" ? "Manual" : "Auto";
-}
+function fmtExecMode(v?: string) { return v === "manual" ? "Manual" : "Auto"; }
 function fmtPct(rule?: { mode?: string; maxPctFromEntry?: number }) {
   if (!rule || rule.mode !== "manual") return "Auto";
   return rule.maxPctFromEntry != null ? `${rule.maxPctFromEntry}%` : "Manual";
@@ -421,57 +522,35 @@ function fmtContracts(rule?: { mode?: string; maxContracts?: number; fixedContra
 function CompareSection({
   activeTab,
   equityConfig,
+  commodityConfig,
+  cryptoConfig,
   optionsConfig,
-  globalEquity,
-  globalOptions,
+  global,
 }: {
-  activeTab: "equity" | "options";
+  activeTab: ValidatorProfile;
   equityConfig: NormalizedValidatorConfig;
+  commodityConfig: NormalizedValidatorConfig;
+  cryptoConfig: NormalizedValidatorConfig;
   optionsConfig: Required<ProfileConfig>;
-  globalEquity?: ProfileConfig | undefined;
-  globalOptions?: ProfileConfig | undefined;
+  global?: ProfileConfig;
 }) {
+  const lotPairs = (cfg: NormalizedValidatorConfig): ComparePair[] => [
+    { label: "Execution", global: fmtExecMode(global?.executionMode), channel: fmtExecMode(cfg.executionMode) },
+    { label: "SL max %",  global: fmtPct(global?.fields?.sl),          channel: fmtPct(cfg.fields?.sl) },
+    { label: "TP max %",  global: fmtPct(global?.fields?.tp),          channel: fmtPct(cfg.fields?.tp) },
+    { label: "Size",      global: fmtLots(global?.fields?.lotSize),     channel: fmtLots(cfg.fields?.lotSize) },
+  ];
+
   const pairs: ComparePair[] =
-    activeTab === "equity"
+    activeTab === "options"
       ? [
-          {
-            label: "Execution",
-            global: fmtExecMode(globalEquity?.executionMode),
-            channel: fmtExecMode(equityConfig.executionMode),
-          },
-          {
-            label: "SL max %",
-            global: fmtPct(globalEquity?.fields?.sl),
-            channel: fmtPct(equityConfig.fields?.sl),
-          },
-          {
-            label: "TP max %",
-            global: fmtPct(globalEquity?.fields?.tp),
-            channel: fmtPct(equityConfig.fields?.tp),
-          },
-          {
-            label: "Lot size",
-            global: fmtLots(globalEquity?.fields?.lotSize),
-            channel: fmtLots(equityConfig.fields?.lotSize),
-          },
+          { label: "Execution", global: fmtExecMode(global?.executionMode), channel: fmtExecMode(optionsConfig.executionMode) },
+          { label: "SL max %",  global: fmtPct(global?.fields?.sl),         channel: fmtPct(optionsConfig.fields?.sl) },
+          { label: "Contracts", global: fmtContracts(global?.fields?.contractSize), channel: fmtContracts(optionsConfig.fields?.contractSize) },
         ]
-      : [
-          {
-            label: "Execution",
-            global: fmtExecMode(globalOptions?.executionMode),
-            channel: fmtExecMode(optionsConfig.executionMode),
-          },
-          {
-            label: "SL max %",
-            global: fmtPct(globalOptions?.fields?.sl),
-            channel: fmtPct(optionsConfig.fields?.sl),
-          },
-          {
-            label: "Contracts",
-            global: fmtContracts(globalOptions?.fields?.contractSize),
-            channel: fmtContracts(optionsConfig.fields?.contractSize),
-          },
-        ];
+      : activeTab === "commodity" ? lotPairs(commodityConfig)
+      : activeTab === "crypto"    ? lotPairs(cryptoConfig)
+      : lotPairs(equityConfig);
 
   const diffCount = pairs.filter((p) => p.global !== p.channel).length;
 
@@ -502,9 +581,7 @@ function CompareSection({
                 <td className="py-1 font-mono text-[.6rem] text-text-secondary">{p.global}</td>
                 <td className={`py-1 font-mono text-[.6rem] ${isDiff ? "font-bold text-accent" : "text-text-secondary"}`}>
                   {p.channel}
-                  {isDiff && (
-                    <span className="ml-1.5 font-mono text-[.52rem] text-text-muted">← override</span>
-                  )}
+                  {isDiff && <span className="ml-1.5 font-mono text-[.52rem] text-text-muted">← override</span>}
                 </td>
               </tr>
             );
