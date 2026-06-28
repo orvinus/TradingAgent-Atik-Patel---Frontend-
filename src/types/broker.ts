@@ -1,6 +1,6 @@
 // src/types/broker.ts
 
-export type BrokerType = "alpaca" | "tradier" | "binance" | "coinbase" | "kraken" | "public" | "robinhood";
+export type BrokerType = "alpaca" | "tradier" | "binance" | "coinbase" | "kraken" | "public" | "robinhood" | "mt5";
 export type BrokerEnvironment = "paper" | "live" | "testnet";
 export type BrokerConnectionStatus = "active" | "inactive" | "error";
 
@@ -85,6 +85,16 @@ export interface CreateBinanceConnectionPayload {
   api_secret?: string;
   ed25519_pem?: string;
   signing_method?: "hmac" | "ed25519";
+  confirm_secret_storage: true;
+}
+
+// MT5 — login + password + server (paper or live)
+export interface CreateMT5ConnectionPayload {
+  environment: "paper" | "live";
+  display_name?: string;
+  login: string;
+  password: string;
+  server: string;
   confirm_secret_storage: true;
 }
 

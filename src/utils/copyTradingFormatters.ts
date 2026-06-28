@@ -4,7 +4,7 @@ import type { InstrumentProfile, SizeUnit } from "@/types/copyValidator";
 export function formatSizeLabel(qty: number | null | undefined, sizeUnit: SizeUnit | null | undefined): string {
   if (qty == null) return "—";
   const unit = sizeUnit ?? "shares";
-  const label = unit === "contracts" ? "contracts" : unit === "units" ? "units" : "shares";
+  const label = unit === "contracts" ? "contracts" : unit === "units" ? "units" : unit === "lots" ? "lots" : "shares";
   return `${qty} ${label}`;
 }
 
@@ -51,6 +51,18 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     "Contract count exceeds your options limit setting.",
   MAX_PREMIUM_EXCEEDED:
     "Option premium exceeds your max premium setting.",
+  SYMBOL_EXCLUDED:
+    "This symbol is on your excluded list for this asset type.",
+  SYMBOL_NOT_INCLUDED:
+    "This symbol is not on your allowed list for this asset type.",
+  SYMBOL_MISSING:
+    "Signal has no symbol — cannot validate against your symbol filter.",
+  MESSAGE_EXCLUDED:
+    "This message contains a blocked phrase and was not copied.",
+  MESSAGE_NOT_INCLUDED:
+    "This message does not contain any required phrase for your filter rules.",
+  MESSAGE_TEXT_MISSING:
+    "No message text available to check against your phrase filter.",
   VALIDATION_FAILED:
     "Signal failed your validation rules — review settings.",
   INVALID_LEVELS_MARKET:
@@ -61,6 +73,16 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
     "Your validator requires a limit price but this signal is a market order. Set order type to Auto in Validation & Limits.",
   SLIPPAGE_EXCEEDED:
     "Price moved too far from the signal. Order not sent.",
+  SLIPPAGE_EXCEEDED_PIPS:
+    "Market price is too many pips from the signal reference. Order not sent.",
+  SLIPPAGE_EXCEEDED_POINTS:
+    "Market price is too many points from the signal reference. Order not sent.",
+  SPREAD_TOO_WIDE:
+    "Bid-ask spread exceeds your maximum tolerance. Order not sent.",
+  SPREAD_TOO_WIDE_PIPS:
+    "Bid-ask spread is too wide in pips. Order not sent.",
+  SPREAD_TOO_WIDE_POINTS:
+    "Bid-ask spread is too wide in points. Order not sent.",
 };
 
 export function mapErrorCode(code: string | null | undefined, fallback?: string): string {
@@ -90,6 +112,14 @@ export const INSTRUMENT_PROFILE_CONFIG: Record<
     borderColor: "border-blue-500/40",
     sizeLabel: "Shares",
     priceLabel: "Entry / Limit price",
+  },
+  commodity: {
+    label: "Commodity",
+    color: "text-amber-400",
+    bgColor: "bg-amber-500/10",
+    borderColor: "border-amber-500/40",
+    sizeLabel: "Lots",
+    priceLabel: "Spot price",
   },
   options: {
     label: "Options",

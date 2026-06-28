@@ -21,6 +21,13 @@ function apiErr(err: unknown): string {
   return "Something went wrong.";
 }
 
+const PROFILE_DESCRIPTIONS: Record<ValidatorProfile, string> = {
+  equity: "Rules for equity, ETF, and FX signals (shares / lot size).",
+  commodity: "Spot commodity signals — gold, silver, oil (lot size in lots). Separate from equity limits.",
+  crypto: "Crypto spot and perps (units). Separate from equity limits.",
+  options: "Futures and options contracts. Uses contract size and optional premium cap.",
+};
+
 export default function CopyTradingValidator() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -32,74 +39,111 @@ export default function CopyTradingValidator() {
     staleTime: 60 * 60 * 1000,
   });
 
-  // Load equity config (global)
+  // ── Per-profile queries ──────────────────────────────────────────────────────
   const equityConfigQuery = useQuery({
-    queryKey: qk.copyValidatorConfig(),
-    queryFn: () => copyValidatorApi.getConfig(),
+    queryKey: qk.copyValidatorConfigProfile("equity"),
+    queryFn: () => copyValidatorApi.getConfig("equity"),
   });
-
-  // Load options profile config
+  const commodityConfigQuery = useQuery({
+    queryKey: qk.copyValidatorConfigProfile("commodity"),
+    queryFn: () => copyValidatorApi.getConfig("commodity"),
+  });
+  const cryptoConfigQuery = useQuery({
+    queryKey: qk.copyValidatorConfigProfile("crypto"),
+    queryFn: () => copyValidatorApi.getConfig("crypto"),
+  });
   const optionsConfigQuery = useQuery({
     queryKey: qk.copyValidatorConfigProfile("options"),
     queryFn: () => copyValidatorApi.getConfig("options"),
   });
 
+  // ── Per-profile local state ──────────────────────────────────────────────────
   const [equityConfig, setEquityConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
+  const [commodityConfig, setCommodityConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
+  const [cryptoConfig, setCryptoConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
   const [optionsConfig, setOptionsConfig] = useState<Required<ProfileConfig>>(normalizeOptionsConfig());
+
+  const extractProfile = (data: unknown, profile: ValidatorProfile): ProfileConfig | undefined => {
+    const d = data as { profiles?: Record<string, ProfileConfig>; effectiveConfig?: ProfileConfig } | undefined;
+    return d?.effectiveConfig ?? d?.profiles?.[profile] ?? (data as ProfileConfig | undefined);
+  };
 
   useEffect(() => {
     if (equityConfigQuery.data) {
-      setEquityConfig(normalizeConfig(equityConfigQuery.data));
-      // If profiles.equity exists, also hydrate from it
-      const profileEquity = (equityConfigQuery.data as { profiles?: { equity?: ProfileConfig } }).profiles?.equity;
-      if (profileEquity) setEquityConfig(normalizeConfig({ ...equityConfigQuery.data, ...profileEquity }));
+      const p = extractProfile(equityConfigQuery.data, "equity");
+      setEquityConfig(normalizeConfig(p ?? equityConfigQuery.data));
     }
   }, [equityConfigQuery.data]);
 
   useEffect(() => {
+    if (commodityConfigQuery.data) {
+      const p = extractProfile(commodityConfigQuery.data, "commodity");
+      setCommodityConfig(normalizeConfig(p ?? commodityConfigQuery.data));
+    }
+  }, [commodityConfigQuery.data]);
+
+  useEffect(() => {
+    if (cryptoConfigQuery.data) {
+      const p = extractProfile(cryptoConfigQuery.data, "crypto");
+      setCryptoConfig(normalizeConfig(p ?? cryptoConfigQuery.data));
+    }
+  }, [cryptoConfigQuery.data]);
+
+  useEffect(() => {
     if (optionsConfigQuery.data) {
-      const profileOptions = (optionsConfigQuery.data as { profiles?: { options?: ProfileConfig }; effectiveConfig?: ProfileConfig }).effectiveConfig
-        ?? (optionsConfigQuery.data as { profiles?: { options?: ProfileConfig } }).profiles?.options
-        ?? optionsConfigQuery.data;
-      setOptionsConfig(normalizeOptionsConfig(profileOptions as ProfileConfig));
+      const p = extractProfile(optionsConfigQuery.data, "options");
+      setOptionsConfig(normalizeOptionsConfig(p as ProfileConfig));
     }
   }, [optionsConfigQuery.data]);
 
+  // ── Save mutation ────────────────────────────────────────────────────────────
   const saveMut = useMutation({
     mutationFn: (body: ValidatorConfigBody) => copyValidatorApi.updateConfig(body),
-    onSuccess: (saved) => {
+    onSuccess: () => {
       toast.success("Validation settings saved");
-      qc.invalidateQueries({ queryKey: qk.copyValidatorConfig() });
-      qc.invalidateQueries({ queryKey: qk.copyValidatorConfigProfile("options") });
-      qc.setQueryData(qk.copyValidatorConfig(), saved);
+      qc.invalidateQueries({ queryKey: qk.copyValidatorConfigProfile(activeTab) });
     },
     onError: (e) => toast.error(apiErr(e)),
   });
 
   const onSave = () => {
-    if (activeTab === "equity") {
-      const errs = validateConfig(equityConfig);
-      if (errs.length) { toast.error(errs[0] ?? "Please fix the highlighted rules."); return; }
-      saveMut.mutate({
-        ...serializeConfig(equityConfig),
-        profiles: { equity: serializeConfig(equityConfig) },
-      });
-    } else {
+    if (activeTab === "options") {
       saveMut.mutate({
         profiles: {
           options: {
             executionMode: optionsConfig.executionMode,
             onViolation: optionsConfig.onViolation,
             fields: optionsConfig.fields,
+            ...(optionsConfig.symbolFilter && (optionsConfig.symbolFilter.include || optionsConfig.symbolFilter.exclude)
+              ? { symbolFilter: optionsConfig.symbolFilter }
+              : {}),
+            ...(optionsConfig.messageFilter && (optionsConfig.messageFilter.include || optionsConfig.messageFilter.exclude)
+              ? { messageFilter: optionsConfig.messageFilter }
+              : {}),
           },
         },
       });
+      return;
     }
+
+    const cfg = activeTab === "equity" ? equityConfig : activeTab === "commodity" ? commodityConfig : cryptoConfig;
+    const errs = validateConfig(cfg);
+    if (errs.length) { toast.error(errs[0] ?? "Please fix the highlighted rules."); return; }
+    saveMut.mutate({ profiles: { [activeTab]: serializeConfig(cfg) } });
   };
 
-  const isLoading = activeTab === "equity" ? equityConfigQuery.isLoading : optionsConfigQuery.isLoading;
-  const isError = activeTab === "equity" ? equityConfigQuery.isError : optionsConfigQuery.isError;
-  const loadError = activeTab === "equity" ? equityConfigQuery.error : optionsConfigQuery.error;
+  const activeQuery = {
+    equity: equityConfigQuery,
+    commodity: commodityConfigQuery,
+    crypto: cryptoConfigQuery,
+    options: optionsConfigQuery,
+  }[activeTab];
+
+  const isLoading = activeQuery.isLoading;
+  const isError = activeQuery.isError;
+  const loadError = activeQuery.error;
+
+  const saveLabel = { equity: "Equity", commodity: "Commodity", crypto: "Crypto", options: "Futures & Options" }[activeTab];
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -114,7 +158,7 @@ export default function CopyTradingValidator() {
           Validation &amp; Limits
         </h1>
         <p className="mt-1 font-mono text-[.7rem] text-text-muted">
-          Apply separate risk rules for equity trades and options contracts.
+          Apply separate risk rules for each asset class: equity, commodity, crypto, and futures &amp; options.
         </p>
       </div>
 
@@ -141,6 +185,11 @@ export default function CopyTradingValidator() {
       <div className="rounded-lg border border-border-subtle bg-bg-surface shadow-card">
         <div className="px-5 pt-5">
           <ProfileSettingsTabs activeTab={activeTab} onTabChange={setActiveTab}>
+            {/* Profile description */}
+            <p className="mb-4 font-mono text-[.63rem] text-text-muted">
+              {PROFILE_DESCRIPTIONS[activeTab]}
+            </p>
+
             {isLoading ? (
               <div className="flex items-center gap-2 font-mono text-[.65rem] text-text-muted pb-5">
                 <LuLoader className="h-3.5 w-3.5 animate-spin" /> Loading settings…
@@ -149,10 +198,44 @@ export default function CopyTradingValidator() {
               <div className="rounded-sm border border-bear/30 bg-bear/10 px-3 py-2 font-mono text-[.65rem] text-bear mb-5">
                 Couldn't load validator settings. {apiErr(loadError)}
               </div>
-            ) : activeTab === "equity" ? (
-              <ValidatorForm config={equityConfig} onChange={setEquityConfig} options={optionsQuery.data} />
+            ) : activeTab === "options" ? (
+              <OptionsValidatorForm
+                config={optionsConfig}
+                onChange={setOptionsConfig}
+                {...(optionsQuery.data?.messageFilter?.suggestedExcludeDefaults != null
+                  ? { suggestedMessagePhrases: optionsQuery.data.messageFilter.suggestedExcludeDefaults }
+                  : {})}
+              />
+            ) : activeTab === "commodity" ? (
+              <ValidatorForm
+                config={commodityConfig}
+                onChange={setCommodityConfig}
+                options={optionsQuery.data}
+                profile="commodity"
+                {...(optionsQuery.data?.messageFilter?.suggestedExcludeDefaults != null
+                  ? { suggestedMessagePhrases: optionsQuery.data.messageFilter.suggestedExcludeDefaults }
+                  : {})}
+              />
+            ) : activeTab === "crypto" ? (
+              <ValidatorForm
+                config={cryptoConfig}
+                onChange={setCryptoConfig}
+                options={optionsQuery.data}
+                profile="crypto"
+                {...(optionsQuery.data?.messageFilter?.suggestedExcludeDefaults != null
+                  ? { suggestedMessagePhrases: optionsQuery.data.messageFilter.suggestedExcludeDefaults }
+                  : {})}
+              />
             ) : (
-              <OptionsValidatorForm config={optionsConfig} onChange={setOptionsConfig} />
+              <ValidatorForm
+                config={equityConfig}
+                onChange={setEquityConfig}
+                options={optionsQuery.data}
+                profile="equity"
+                {...(optionsQuery.data?.messageFilter?.suggestedExcludeDefaults != null
+                  ? { suggestedMessagePhrases: optionsQuery.data.messageFilter.suggestedExcludeDefaults }
+                  : {})}
+              />
             )}
 
             <div className="mt-6 mb-5 flex justify-end">
@@ -162,15 +245,15 @@ export default function CopyTradingValidator() {
                 className="inline-flex items-center gap-2 rounded-sm bg-accent px-5 py-2.5 font-mono text-[.68rem] font-bold uppercase tracking-widest text-bg-base transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saveMut.isPending && <LuLoader className="h-3.5 w-3.5 animate-spin" />}
-                Save {activeTab === "equity" ? "Equity" : "Options"} settings
+                Save {saveLabel} settings
               </button>
             </div>
           </ProfileSettingsTabs>
         </div>
       </div>
 
-      {/* Preview */}
-      <PreviewPanel draftConfig={equityConfig} />
+      {/* Preview — equity only for now */}
+      {activeTab === "equity" && <PreviewPanel draftConfig={equityConfig} />}
 
       {/* Per-source overrides */}
       <SourceOverrides options={optionsQuery.data} />

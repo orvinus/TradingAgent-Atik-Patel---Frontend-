@@ -7,23 +7,31 @@ import type {
   ExecutionMode,
   FieldMode,
   LotSizeRule,
+  MessageFilter,
   NormalizedValidatorConfig,
   OnViolation,
   OrderTypeRule,
   OrderTypeValue,
   PctFieldRule,
+  ProfileConfig,
   SlippageMode,
   SlippageRule,
   SpreadMode,
   SpreadRule,
+  SymbolFilter,
+  ToleranceUnit,
   TrailingStopRule,
   ValidatorConfigBody,
   ValidatorFieldKey,
   ValidatorFields,
   ValidatorOptions,
+  ValidatorProfile,
 } from "@/types/copyValidator";
 import { FIELD_DEFS, ORDER_TYPE_OPTIONS, ORDER_TYPE_LABELS, TOOLTIPS } from "./fieldMeta";
 import { InfoTip } from "./InfoTip";
+import { MessageFilterSection } from "./MessageFilterSection";
+import { SymbolFilterSection } from "./SymbolFilterSection";
+import { ToleranceRow } from "./ToleranceRow";
 
 // ── Defaults / normalisation ──────────────────────────────────────────────────
 export function buildDefaultFields(): ValidatorFields {
@@ -42,13 +50,17 @@ export function buildDefaultFields(): ValidatorFields {
   };
 }
 
-export function normalizeConfig(c?: ValidatorConfigBody): NormalizedValidatorConfig {
+export function normalizeConfig(c?: ValidatorConfigBody | ProfileConfig): NormalizedValidatorConfig {
   const result: NormalizedValidatorConfig = {
     executionMode: c?.executionMode ?? "auto",
     onViolation: c?.onViolation ?? "reject",
     fields: { ...buildDefaultFields(), ...(c?.fields ?? {}) },
   };
-  if (c?.profiles != null) result.profiles = c.profiles;
+  const asBody = c as ValidatorConfigBody | undefined;
+  if (asBody?.profiles != null) result.profiles = asBody.profiles;
+  const pc = c as ProfileConfig | undefined;
+  if (pc?.symbolFilter != null) result.symbolFilter = pc.symbolFilter;
+  if (pc?.messageFilter != null) result.messageFilter = pc.messageFilter;
   return result;
 }
 
@@ -63,16 +75,27 @@ const inputCls =
 const selectCls =
   "rounded-sm border border-border-default bg-bg-base px-2 py-1 font-mono text-[.68rem] text-text-primary outline-none focus:border-accent disabled:opacity-40";
 
+function sizeUnitLabelFor(profile?: ValidatorProfile): string {
+  if (profile === "commodity") return "Lots";
+  if (profile === "crypto") return "Units";
+  return "Shares";
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function ValidatorForm({
   config,
   onChange,
   options,
+  profile,
+  suggestedMessagePhrases,
 }: {
   config: NormalizedValidatorConfig;
   onChange: (next: NormalizedValidatorConfig) => void;
   options?: ValidatorOptions | undefined;
+  profile?: ValidatorProfile;
+  suggestedMessagePhrases?: string[];
 }) {
+  const showTrailingStop = !profile || profile === "equity";
   const manual = config.executionMode === "manual";
 
   // Runtime label/tooltip overrides keyed by field.
@@ -80,6 +103,8 @@ export default function ValidatorForm({
 
   const setExecutionMode = (executionMode: ExecutionMode) => onChange({ ...config, executionMode });
   const setOnViolation = (onViolation: OnViolation) => onChange({ ...config, onViolation });
+  const setSymbolFilter = (symbolFilter: SymbolFilter) => onChange({ ...config, symbolFilter });
+  const setMessageFilter = (messageFilter: MessageFilter) => onChange({ ...config, messageFilter });
 
   const setField = (key: ValidatorFieldKey, value: ValidatorFields[ValidatorFieldKey]) =>
     onChange({ ...config, fields: { ...config.fields, [key]: value } });
@@ -124,6 +149,20 @@ export default function ValidatorForm({
         </span>
       </div>
 
+      {/* Symbol filter */}
+      <SymbolFilterSection
+        profile={profile ?? "equity"}
+        value={config.symbolFilter ?? {}}
+        onChange={setSymbolFilter}
+      />
+
+      {/* Message phrase filter */}
+      <MessageFilterSection
+        value={config.messageFilter ?? {}}
+        onChange={setMessageFilter}
+        {...(suggestedMessagePhrases != null ? { suggestedDefaults: suggestedMessagePhrases } : {})}
+      />
+
       {/* Field rules */}
       <div>
         <div className="mb-2 flex items-center gap-2 font-mono text-[.58rem] uppercase tracking-[.18em] text-text-disabled">
@@ -159,9 +198,10 @@ export default function ValidatorForm({
               </tr>
             </thead>
             <tbody>
-              {FIELD_DEFS.map((def) => {
+              {FIELD_DEFS.filter((def) => def.key !== "trailingStop" || showTrailingStop).map((def) => {
                 const opt = optByKey.get(def.key);
-                const label = opt?.label ?? def.label;
+                const rawLabel = opt?.label ?? def.label;
+                const label = def.key === "lotSize" ? `${rawLabel} (${sizeUnitLabelFor(profile)})` : rawLabel;
                 const tip = opt?.tooltip ?? opt?.description ?? def.tooltip;
 
                 if (def.kind === "slippage") {
@@ -216,7 +256,7 @@ export default function ValidatorForm({
                     </td>
                     <td className="px-3 py-2 align-top">
                       {rule.mode === "manual" ? (
-                        <RuleInputs def={def} rule={rule} disabled={!manual} onChange={(v) => setField(def.key, v)} />
+                        <RuleInputs def={def} rule={rule} disabled={!manual} onChange={(v) => setField(def.key, v)} sizeUnit={sizeUnitLabelFor(profile)} />
                       ) : (
                         <span className="font-mono text-[.62rem] text-text-disabled">Use signal value</span>
                       )}
@@ -265,11 +305,13 @@ function RuleInputs({
   rule,
   disabled,
   onChange,
+  sizeUnit,
 }: {
   def: (typeof FIELD_DEFS)[number];
   rule: ValidatorFields[ValidatorFieldKey];
   disabled: boolean;
   onChange: (v: ValidatorFields[ValidatorFieldKey]) => void;
+  sizeUnit?: string;
 }) {
   if (def.kind === "pct") {
     const r = rule as PctFieldRule;
@@ -295,6 +337,7 @@ function RuleInputs({
   if (def.kind === "lotSize") {
     const r = rule as LotSizeRule;
     const sel: "max" | "fixed" = r.fixedLots != null ? "fixed" : "max";
+    const unitLower = sizeUnit?.toLowerCase() ?? "lots";
     return (
       <div className="flex flex-col gap-2">
         <label className="flex items-center gap-2">
@@ -306,7 +349,7 @@ function RuleInputs({
             className="h-3.5 w-3.5 accent-[var(--color-accent)]"
           />
           <span className="inline-flex items-center gap-1 font-mono text-[.65rem] text-text-secondary">
-            Maximum lots allowed <InfoTip text={TOOLTIPS.maxLots} />
+            Max {unitLower} allowed <InfoTip text={TOOLTIPS.maxLots} />
           </span>
           <input
             type="number"
@@ -326,7 +369,7 @@ function RuleInputs({
             className="h-3.5 w-3.5 accent-[var(--color-accent)]"
           />
           <span className="inline-flex items-center gap-1 font-mono text-[.65rem] text-text-secondary">
-            Fixed lot size (always) <InfoTip text={TOOLTIPS.fixedLots} />
+            Fixed {unitLower} (always) <InfoTip text={TOOLTIPS.fixedLots} />
           </span>
           <input
             type="number"
@@ -447,156 +490,62 @@ function PctInput({
   );
 }
 
-// ── Spread row — 3-way mode (off / auto / manual) ─────────────────────────────
+// ── Spread row ─────────────────────────────────────────────────────────────────
 
 function SpreadRow({
   label,
   tip,
   rule,
   disabled,
+  defaultUnit,
   onChange,
 }: {
   label: string;
   tip?: string | undefined;
   rule: SpreadRule;
   disabled: boolean;
+  defaultUnit?: ToleranceUnit;
   onChange: (r: SpreadRule) => void;
 }) {
-  const showPct = rule.mode === "auto" || rule.mode === "manual";
-  const required = rule.mode === "manual";
-  const invalid = required && (rule.maxPct == null || rule.maxPct <= 0);
   return (
-    <tr className="border-b border-border-subtle last:border-0">
-      <td className="px-3 py-2 align-top">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[.68rem] text-text-primary">
-          {label}
-          {tip && <InfoTip text={tip} />}
-        </span>
-      </td>
-      <td className="px-3 py-2 align-top">
-        <select
-          value={rule.mode}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...rule, mode: e.target.value as SpreadMode })}
-          className={selectCls}
-        >
-          <option value="off">Off</option>
-          <option value="auto">Auto</option>
-          <option value="manual">Manual</option>
-        </select>
-      </td>
-      <td className="px-3 py-2 align-top">
-        {rule.mode === "off" ? (
-          <span className="font-mono text-[.62rem] text-text-disabled">Disabled</span>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <label className="flex items-center gap-1.5">
-              <span className="font-mono text-[.62rem] text-text-muted">
-                Max %{required ? " *" : ""}
-              </span>
-              <input
-                type="number"
-                min={0.01}
-                max={50}
-                step="0.01"
-                value={showPct ? (rule.maxPct ?? "") : ""}
-                disabled={disabled}
-                placeholder={rule.mode === "auto" ? "1.0" : ""}
-                onChange={(e) => {
-                  const v = numOrUndef(e.target.value);
-                  const next: SpreadRule = { mode: rule.mode };
-                  if (v != null) next.maxPct = v;
-                  onChange(next);
-                }}
-                className={`${inputCls} ${invalid ? "border-bear" : ""}`}
-              />
-              <span className="font-mono text-[.6rem] text-text-muted">%</span>
-            </label>
-            {rule.mode === "auto" && (
-              <span className="font-mono text-[.58rem] text-text-muted">
-                Uses your value if set, otherwise server default 1%
-              </span>
-            )}
-          </div>
-        )}
-      </td>
-    </tr>
+    <ToleranceRow
+      label={label}
+      {...(tip != null ? { tip } : {})}
+      rule={rule}
+      disabled={disabled}
+      defaultUnit={defaultUnit ?? "pct"}
+      autoDefault="spreadDefault"
+      onChange={(r) => onChange(r as SpreadRule)}
+    />
   );
 }
 
-// ── Slippage row — 3-way mode (off / auto / manual) ───────────────────────────
+// ── Slippage row ───────────────────────────────────────────────────────────────
 
 function SlippageRow({
   label,
   tip,
   rule,
   disabled,
+  defaultUnit,
   onChange,
 }: {
   label: string;
   tip?: string | undefined;
   rule: SlippageRule;
   disabled: boolean;
+  defaultUnit?: ToleranceUnit;
   onChange: (r: SlippageRule) => void;
 }) {
-  const showPct = rule.mode === "auto" || rule.mode === "manual";
-  const required = rule.mode === "manual";
-  const invalid = required && (rule.maxPct == null || rule.maxPct <= 0);
   return (
-    <tr className="border-b border-border-subtle last:border-0">
-      <td className="px-3 py-2 align-top">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[.68rem] text-text-primary">
-          {label}
-          {tip && <InfoTip text={tip} />}
-        </span>
-      </td>
-      <td className="px-3 py-2 align-top">
-        <select
-          value={rule.mode}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...rule, mode: e.target.value as SlippageMode })}
-          className={selectCls}
-        >
-          <option value="off">Off</option>
-          <option value="auto">Auto</option>
-          <option value="manual">Manual</option>
-        </select>
-      </td>
-      <td className="px-3 py-2 align-top">
-        {rule.mode === "off" ? (
-          <span className="font-mono text-[.62rem] text-text-disabled">Disabled</span>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <label className="flex items-center gap-1.5">
-              <span className="font-mono text-[.62rem] text-text-muted">
-                Max %{required ? " *" : ""}
-              </span>
-              <input
-                type="number"
-                min={0.01}
-                max={50}
-                step="0.01"
-                value={showPct ? (rule.maxPct ?? "") : ""}
-                disabled={disabled}
-                placeholder={rule.mode === "auto" ? "0.5" : ""}
-                onChange={(e) => {
-                  const v = numOrUndef(e.target.value);
-                  const next: SlippageRule = { mode: rule.mode };
-                  if (v != null) next.maxPct = v;
-                  onChange(next);
-                }}
-                className={`${inputCls} ${invalid ? "border-bear" : ""}`}
-              />
-              <span className="font-mono text-[.6rem] text-text-muted">%</span>
-            </label>
-            {rule.mode === "auto" && (
-              <span className="font-mono text-[.58rem] text-text-muted">
-                Uses your value if set, otherwise server default 0.5%
-              </span>
-            )}
-          </div>
-        )}
-      </td>
-    </tr>
+    <ToleranceRow
+      label={label}
+      {...(tip != null ? { tip } : {})}
+      rule={rule}
+      disabled={disabled}
+      defaultUnit={defaultUnit ?? "pct"}
+      autoDefault="slipDefault"
+      onChange={(r) => onChange(r as SlippageRule)}
+    />
   );
 }

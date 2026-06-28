@@ -11,7 +11,7 @@ import { qk } from "@/api/queryKeys";
 import { toast } from "@/components/ui/Toast";
 import {
   LuLoader, LuPlus, LuRefreshCw, LuCheck, LuX, LuArrowLeft,
-  LuTrash2, LuSearch, LuChevronLeft, LuChevronRight, LuLogOut,
+  LuTrash2, LuSearch, LuChevronLeft, LuChevronRight, LuLogOut, LuHistory,
 } from "react-icons/lu";
 import {
   getBrokerInfo,
@@ -32,7 +32,7 @@ import type {
 } from "@/types/broker";
 
 const INTEGRATED_BROKERS = new Set<BrokerType>([
-  "alpaca", "tradier", "binance", "coinbase", "kraken", "public", "robinhood",
+  "alpaca", "tradier", "binance", "coinbase", "kraken", "public", "robinhood", "mt5",
 ]);
 
 function isBrokerType(v: string | undefined): v is BrokerType {
@@ -324,6 +324,7 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
   const [minQty, setMinQty] = useState("");
   const [showSubmit, setShowSubmit] = useState(false);
   const [exitPosition, setExitPosition] = useState<{ symbol: string; maxQty: string } | null>(null);
+  const [historySymbol, setHistorySymbol] = useState<string | null>(null);
   const qc = useQueryClient();
 
   const VIEWS: { id: View; label: string }[] = [
@@ -514,7 +515,7 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
 
       {/* Table */}
       <div className="rounded-lg border border-border-subtle bg-bg-surface p-4">
-        {view === "positions" && <PositionsTable cid={cid} broker={broker} search={search} onExit={(symbol, qty) => setExitPosition({ symbol, maxQty: qty })} />}
+        {view === "positions" && <PositionsTable cid={cid} broker={broker} search={search} onExit={(symbol, qty) => setExitPosition({ symbol, maxQty: qty })} onHistory={(symbol) => setHistorySymbol(symbol)} />}
         {view === "orders"    && <OrdersTable    cid={cid} broker={broker} search={search} side={side} status={orderStatus} orderType={orderType} detailStatus={detailStatus} hasLimit={hasLimit} hasStop={hasStop} minQty={minQty} />}
         {view === "fills"     && <FillsTable     cid={cid} broker={broker} search={search} side={side} />}
       </div>
@@ -543,6 +544,15 @@ function ActivityTable({ cid, broker }: { cid: string; broker: BrokerType }) {
             qc.invalidateQueries({ queryKey: positionsKey(broker, cid) });
             qc.invalidateQueries({ queryKey: ordersKey(broker, cid, orderStatus) });
           }}
+        />
+      )}
+
+      {historySymbol && (
+        <PositionHistoryModal
+          cid={cid}
+          broker={broker}
+          symbol={historySymbol}
+          onClose={() => setHistorySymbol(null)}
         />
       )}
     </section>
@@ -649,11 +659,13 @@ function PositionsTable({
   broker,
   search,
   onExit,
+  onHistory,
 }: {
   cid: string;
   broker: BrokerType;
   search: string;
   onExit: (symbol: string, qty: string) => void;
+  onHistory: (symbol: string) => void;
 }) {
   const api = useBrokerApi(broker);
   const [page, setPage] = useState(1);
@@ -682,7 +694,7 @@ function PositionsTable({
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-border-subtle">
-              {["Symbol", "Qty", "Avg Cost", "Mark Price", "Unrealized P&L", ""].map((h) => (
+              {["Symbol", "Qty", "Avg Cost", "Mark Price", "Unrealized P&L", "", ""].map((h) => (
                 <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
                   {h}
                 </th>
@@ -701,13 +713,22 @@ function PositionsTable({
                   <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${pnl >= 0 ? "text-bull" : "text-bear"}`}>
                     {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
                   </td>
-                  <td className="py-2.5">
+                  <td className="py-2.5 pr-2">
                     <button
                       onClick={() => onExit(pos.symbol, pos.qty)}
                       className="flex items-center gap-1.5 rounded-sm border border-bear/40 bg-bear/10 px-2.5 py-1 font-mono text-[.62rem] font-bold uppercase tracking-widest text-bear transition-colors hover:bg-bear/20"
                     >
                       <LuLogOut className="h-3 w-3" />
                       Exit
+                    </button>
+                  </td>
+                  <td className="py-2.5">
+                    <button
+                      onClick={() => onHistory(pos.symbol)}
+                      title={`View history for ${pos.symbol}`}
+                      className="flex items-center justify-center rounded-sm border border-border-default bg-bg-elevated p-1.5 text-text-muted transition-colors hover:border-accent hover:text-accent"
+                    >
+                      <LuHistory className="h-3.5 w-3.5" />
                     </button>
                   </td>
                 </tr>
@@ -808,7 +829,7 @@ function OrdersTable({
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-border-subtle">
-              {["Symbol", "Side", "Type", "Qty", "Limit", "Stop", "Status", ""].map((h) => (
+              {["Symbol", "Side", "Type", "Qty", "Limit", "Stop", "Status", "Submitted", ""].map((h) => (
                 <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
                   {h}
                 </th>
@@ -867,6 +888,14 @@ function OrderRow({
       </td>
       <td className={`py-2.5 pr-4 font-mono text-[.62rem] uppercase tracking-widest ${statusColor(order.status)}`}>
         {order.status}
+      </td>
+      <td className="py-2.5 pr-4 font-mono text-[.62rem] text-text-disabled whitespace-nowrap">
+        {order.submitted_at
+          ? new Date(order.submitted_at).toLocaleString(undefined, {
+              month: "short", day: "numeric", year: "numeric",
+              hour: "2-digit", minute: "2-digit",
+            })
+          : "—"}
       </td>
       <td className="py-2.5">
         {canCancel && (
@@ -961,6 +990,136 @@ function FillsTable({
         </table>
       </div>
       <Pagination page={page} total={rows.length} onPage={setPage} />
+    </div>
+  );
+}
+
+// ── Position History Modal ────────────────────────────────────────────────────
+
+function PositionHistoryModal({
+  cid,
+  broker,
+  symbol,
+  onClose,
+}: {
+  cid: string;
+  broker: BrokerType;
+  symbol: string;
+  onClose: () => void;
+}) {
+  const api = useBrokerApi(broker);
+
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: [...ordersKey(broker, cid, "closed"), symbol],
+    queryFn: () => api.listOrders(cid, { status: "closed", limit: 200 }),
+    staleTime: 30_000,
+  });
+
+  const history = useMemo(
+    () => orders.filter((o) => (o.symbol ?? "").toUpperCase() === symbol.toUpperCase()),
+    [orders, symbol],
+  );
+
+  const statusColor = (s: string) => {
+    const n = normStatus(s);
+    return n === "filled" ? "text-bull"
+      : n === "canceled" || n === "expired" ? "text-bear"
+      : "text-text-muted";
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="flex w-full max-w-3xl flex-col rounded-lg border border-border-default bg-bg-surface shadow-xl"
+        style={{ maxHeight: "80vh" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-5 py-4">
+          <div className="flex items-center gap-3">
+            <LuHistory className="h-4 w-4 text-accent" />
+            <div>
+              <h2 className="font-display text-base font-bold uppercase tracking-[.1em] text-text-primary">
+                {symbol} — Order History
+              </h2>
+              <p className="mt-0.5 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
+                {broker} · all closed orders for this symbol
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="rounded-sm p-1 text-text-muted transition-colors hover:text-text-primary">
+            <LuX className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto px-5 py-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <LuLoader className="h-5 w-5 animate-spin text-text-muted" />
+            </div>
+          ) : history.length === 0 ? (
+            <p className="py-12 text-center font-mono text-[.7rem] uppercase tracking-widest text-text-muted">
+              No closed orders found for {symbol}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-border-subtle">
+                    {["Side", "Type", "Qty", "Limit", "Stop", "Status", "Submitted"].map((h) => (
+                      <th key={h} className="pb-2 pr-4 font-mono text-[.6rem] uppercase tracking-widest text-text-muted">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((order) => (
+                    <tr key={order.broker_order_id} className="border-b border-border-subtle last:border-0">
+                      <td className={`py-2.5 pr-4 font-mono text-sm font-bold ${normSide(order.side) === "buy" ? "text-bull" : "text-bear"}`}>
+                        {normEnum(order.side)}
+                      </td>
+                      <td className="py-2.5 pr-4 font-mono text-[.68rem] uppercase tracking-widest text-text-secondary">
+                        {normEnum(order.order_type)}
+                      </td>
+                      <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
+                        {order.qty ?? order.notional ?? "—"}
+                      </td>
+                      <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
+                        {order.limit_price ? `$${order.limit_price}` : "—"}
+                      </td>
+                      <td className="py-2.5 pr-4 font-mono text-sm text-text-secondary">
+                        {order.stop_price ? `$${order.stop_price}` : "—"}
+                      </td>
+                      <td className={`py-2.5 pr-4 font-mono text-[.62rem] uppercase tracking-widest ${statusColor(order.status)}`}>
+                        {normStatus(order.status)}
+                      </td>
+                      <td className="py-2.5 font-mono text-[.62rem] text-text-disabled whitespace-nowrap">
+                        {order.submitted_at
+                          ? new Date(order.submitted_at).toLocaleString(undefined, {
+                              month: "short", day: "numeric", year: "numeric",
+                              hour: "2-digit", minute: "2-digit",
+                            })
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {history.length > 0 && (
+          <div className="shrink-0 border-t border-border-subtle px-5 py-3">
+            <span className="font-mono text-[.6rem] uppercase tracking-widest text-text-disabled">
+              {history.length} order{history.length !== 1 ? "s" : ""} found
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

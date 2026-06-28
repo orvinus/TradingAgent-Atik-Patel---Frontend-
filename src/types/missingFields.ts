@@ -44,6 +44,13 @@ export interface MissingFieldsConfig {
   lotSize: LotSizeFieldConfig;
 }
 
+// Full config response including per-profile keys
+export interface MissingFieldsFullConfig {
+  missingFields?: MissingFieldsConfig;
+  commodityMissingFields?: MissingFieldsConfig;
+  cryptoMissingFields?: MissingFieldsConfig;
+}
+
 // ── Options response ──────────────────────────────────────────────────────────
 
 export interface MissingFieldMeta {

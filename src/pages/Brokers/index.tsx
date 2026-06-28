@@ -15,6 +15,7 @@ import {
   CreateKrakenModal,
   CreatePublicModal,
   CreateRobinhoodModal,
+  CreateMT5Modal,
 } from "@/components/broker/BrokerConnectionModals";
 import { BROKERS, type BrokerInfo } from "@/lib/brokers";
 import { ROUTES } from "@/constants/routes";
@@ -192,6 +193,15 @@ export default function Brokers() {
       )}
       {activeModal === "robinhood" && (
         <CreateRobinhoodModal
+          onClose={() => setActiveModal(null)}
+          onCreated={() => {
+            setActiveModal(null);
+            qc.invalidateQueries({ queryKey: qk.allConnections() });
+          }}
+        />
+      )}
+      {activeModal === "mt5" && (
+        <CreateMT5Modal
           onClose={() => setActiveModal(null)}
           onCreated={() => {
             setActiveModal(null);

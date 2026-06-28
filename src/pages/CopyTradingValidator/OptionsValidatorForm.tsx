@@ -6,18 +6,21 @@
 import type {
   ExecutionMode,
   FieldMode,
+  MessageFilter,
   OnViolation,
   ContractSizeRule,
   OrderTypeRule,
   PctFieldRule,
   ProfileConfig,
   SimpleFieldRule,
-  SlippageMode,
   SlippageRule,
-  SpreadMode,
   SpreadRule,
+  SymbolFilter,
 } from "@/types/copyValidator";
 import { InfoTip } from "./InfoTip";
+import { MessageFilterSection } from "./MessageFilterSection";
+import { SymbolFilterSection } from "./SymbolFilterSection";
+import { ToleranceRow } from "./ToleranceRow";
 
 const inputCls =
   "w-20 rounded-sm border border-border-default bg-bg-base px-2 py-1 font-mono text-[.68rem] text-text-primary outline-none focus:border-accent disabled:opacity-40";
@@ -46,6 +49,8 @@ export function buildDefaultOptionsConfig(): ProfileConfig {
       slippage: { mode: "off" },
       spread: { mode: "off" },
     },
+    symbolFilter: {},
+    messageFilter: {},
   };
 }
 
@@ -56,19 +61,24 @@ export function normalizeOptionsConfig(c?: ProfileConfig): Required<ProfileConfi
     onViolation: c?.onViolation ?? "reject",
     fields: { ...base.fields, ...(c?.fields ?? {}) },
     missingFields: c?.missingFields ?? {},
+    symbolFilter: c?.symbolFilter ?? {},
+    messageFilter: c?.messageFilter ?? {},
   };
 }
 
 interface Props {
   config: Required<ProfileConfig>;
   onChange: (next: Required<ProfileConfig>) => void;
+  suggestedMessagePhrases?: string[];
 }
 
-export default function OptionsValidatorForm({ config, onChange }: Props) {
+export default function OptionsValidatorForm({ config, onChange, suggestedMessagePhrases }: Props) {
   const manual = config.executionMode === "manual";
 
   const setExecutionMode = (executionMode: ExecutionMode) => onChange({ ...config, executionMode });
   const setOnViolation = (onViolation: OnViolation) => onChange({ ...config, onViolation });
+  const setSymbolFilter = (symbolFilter: SymbolFilter) => onChange({ ...config, symbolFilter });
+  const setMessageFilter = (messageFilter: MessageFilter) => onChange({ ...config, messageFilter });
 
   const setField = (key: string, value: unknown) =>
     onChange({ ...config, fields: { ...config.fields, [key]: value } });
@@ -119,6 +129,20 @@ export default function OptionsValidatorForm({ config, onChange }: Props) {
           <option value="clamp">Adjust to limit (clamp)</option>
         </select>
       </div>
+
+      {/* Symbol filter */}
+      <SymbolFilterSection
+        profile="options"
+        value={config.symbolFilter ?? {}}
+        onChange={setSymbolFilter}
+      />
+
+      {/* Message phrase filter */}
+      <MessageFilterSection
+        value={config.messageFilter ?? {}}
+        onChange={setMessageFilter}
+        {...(suggestedMessagePhrases != null ? { suggestedDefaults: suggestedMessagePhrases } : {})}
+      />
 
       {/* Field rules */}
       <div>
@@ -391,65 +415,16 @@ function SlippageOptionsRow({
   disabled: boolean;
   onChange: (r: SlippageRule) => void;
 }) {
-  const showPct = rule.mode === "auto" || rule.mode === "manual";
-  const required = rule.mode === "manual";
-  const invalid = required && (rule.maxPct == null || rule.maxPct <= 0);
   return (
-    <tr className="border-b border-border-subtle last:border-0">
-      <td className="px-3 py-2 align-top">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[.68rem] text-text-primary">
-          Slippage tolerance
-          <InfoTip text="Max % the option premium may move from the signal entry. Auto uses server default 0.5%." />
-        </span>
-      </td>
-      <td className="px-3 py-2 align-top">
-        <select
-          value={rule.mode}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...rule, mode: e.target.value as SlippageMode })}
-          className={selectCls}
-        >
-          <option value="off">Off</option>
-          <option value="auto">Auto</option>
-          <option value="manual">Manual</option>
-        </select>
-      </td>
-      <td className="px-3 py-2 align-top">
-        {rule.mode === "off" ? (
-          <span className="font-mono text-[.62rem] text-text-disabled">Disabled</span>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <label className="flex items-center gap-1.5">
-              <span className="font-mono text-[.62rem] text-text-muted">
-                Max %{required ? " *" : ""}
-              </span>
-              <input
-                type="number"
-                min={0.01}
-                max={50}
-                step="0.01"
-                value={showPct ? (rule.maxPct ?? "") : ""}
-                disabled={disabled}
-                placeholder={rule.mode === "auto" ? "0.5" : ""}
-                onChange={(e) => {
-                  const v = numOrUndef(e.target.value);
-                  const next: SlippageRule = { mode: rule.mode };
-                  if (v != null) next.maxPct = v;
-                  onChange(next);
-                }}
-                className={`${inputCls} ${invalid ? "border-bear" : ""}`}
-              />
-              <span className="font-mono text-[.6rem] text-text-muted">% of premium</span>
-            </label>
-            {rule.mode === "auto" && (
-              <span className="font-mono text-[.58rem] text-text-muted">
-                Uses your value if set, otherwise server default 0.5%
-              </span>
-            )}
-          </div>
-        )}
-      </td>
-    </tr>
+    <ToleranceRow
+      label="Slippage tolerance"
+      tip="Max the option premium may move from the signal entry. Auto uses server default 0.5%."
+      rule={rule}
+      disabled={disabled}
+      defaultUnit="pct"
+      autoDefault="slipDefault"
+      onChange={(r) => onChange(r as SlippageRule)}
+    />
   );
 }
 
@@ -462,65 +437,16 @@ function SpreadOptionsRow({
   disabled: boolean;
   onChange: (r: SpreadRule) => void;
 }) {
-  const showPct = rule.mode === "auto" || rule.mode === "manual";
-  const required = rule.mode === "manual";
-  const invalid = required && (rule.maxPct == null || rule.maxPct <= 0);
   return (
-    <tr className="border-b border-border-subtle last:border-0">
-      <td className="px-3 py-2 align-top">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[.68rem] text-text-primary">
-          Spread tolerance
-          <InfoTip text="Max bid-ask spread % before reject. Limit orders cross to ask (buy) or bid (sell). Auto uses server default 1%." />
-        </span>
-      </td>
-      <td className="px-3 py-2 align-top">
-        <select
-          value={rule.mode}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...rule, mode: e.target.value as SpreadMode })}
-          className={selectCls}
-        >
-          <option value="off">Off</option>
-          <option value="auto">Auto</option>
-          <option value="manual">Manual</option>
-        </select>
-      </td>
-      <td className="px-3 py-2 align-top">
-        {rule.mode === "off" ? (
-          <span className="font-mono text-[.62rem] text-text-disabled">Disabled</span>
-        ) : (
-          <div className="flex flex-col gap-1">
-            <label className="flex items-center gap-1.5">
-              <span className="font-mono text-[.62rem] text-text-muted">
-                Max %{required ? " *" : ""}
-              </span>
-              <input
-                type="number"
-                min={0.01}
-                max={50}
-                step="0.01"
-                value={showPct ? (rule.maxPct ?? "") : ""}
-                disabled={disabled}
-                placeholder={rule.mode === "auto" ? "1.0" : ""}
-                onChange={(e) => {
-                  const v = numOrUndef(e.target.value);
-                  const next: SpreadRule = { mode: rule.mode };
-                  if (v != null) next.maxPct = v;
-                  onChange(next);
-                }}
-                className={`${inputCls} ${invalid ? "border-bear" : ""}`}
-              />
-              <span className="font-mono text-[.6rem] text-text-muted">% of premium</span>
-            </label>
-            {rule.mode === "auto" && (
-              <span className="font-mono text-[.58rem] text-text-muted">
-                Uses your value if set, otherwise server default 1%
-              </span>
-            )}
-          </div>
-        )}
-      </td>
-    </tr>
+    <ToleranceRow
+      label="Spread tolerance"
+      tip="Max bid-ask spread before reject. Limit orders cross to ask (buy) or bid (sell). Auto uses server default 1%."
+      rule={rule}
+      disabled={disabled}
+      defaultUnit="pct"
+      autoDefault="spreadDefault"
+      onChange={(r) => onChange(r as SpreadRule)}
+    />
   );
 }
 
