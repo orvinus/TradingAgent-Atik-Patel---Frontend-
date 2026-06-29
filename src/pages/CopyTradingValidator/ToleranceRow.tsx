@@ -1,7 +1,7 @@
 // src/pages/CopyTradingValidator/ToleranceRow.tsx
 // Shared Slippage / Spread row with unit selector (%, pips, points).
 
-import type { SlippageMode, SlippageRule, SpreadRule, ToleranceUnit } from "@/types/copyValidator";
+import type { FieldMode, PctFieldRule, SlippageMode, SlippageRule, SpreadRule, ToleranceUnit, ValidatorProfile } from "@/types/copyValidator";
 import { InfoTip } from "./InfoTip";
 
 export const UNIT_LABELS: Record<ToleranceUnit, string> = {
@@ -16,6 +16,19 @@ export const UNIT_DEFAULTS: Record<ToleranceUnit, { min: number; max: number; st
   pct:    { min: 0.01, max: 50,   step: 0.01, slipDefault: "0.5", spreadDefault: "1.0" },
   pips:   { min: 0.1,  max: 500,  step: 0.1,  slipDefault: "3",   spreadDefault: "2" },
   points: { min: 0.1,  max: 5000, step: 0.1,  slipDefault: "5",   spreadDefault: "3" },
+};
+
+export const RISK_UNIT_LIMITS: Record<ToleranceUnit, { min: number; max: number; step: number }> = {
+  pct:    { min: 0,   max: 100,   step: 0.1 },
+  pips:   { min: 0.1, max: 5000,  step: 0.1 },
+  points: { min: 0.1, max: 50000, step: 0.1 },
+};
+
+const PROFILE_RISK_HINT: Record<ValidatorProfile, string> = {
+  equity:    "Use % for stocks. Pips/points apply if signal is FX-like.",
+  commodity: "Metals (XAUUSD) → pips. Other commodities → % or points.",
+  crypto:    "Typically use %. Pips available for stablecoin pairs if applicable.",
+  options:   "Option premium → %. Underlying futures → points.",
 };
 
 function getMaxValue(rule: SlippageRule | SpreadRule, unit: ToleranceUnit): number | undefined {
@@ -34,6 +47,124 @@ const SLIPPAGE_MODE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "auto", label: "Auto" },
   { value: "manual", label: "Manual" },
 ];
+
+function getRiskValue(rule: PctFieldRule, unit: ToleranceUnit, kind: "max" | "min"): number | undefined {
+  if (unit === "pips")   return kind === "max" ? rule.maxPipsFromEntry   : rule.minPipsFromEntry;
+  if (unit === "points") return kind === "max" ? rule.maxPointsFromEntry : rule.minPointsFromEntry;
+  return kind === "max" ? rule.maxPctFromEntry : rule.minPctFromEntry;
+}
+
+function buildRiskRule(mode: FieldMode, unit: ToleranceUnit, maxVal?: number, minVal?: number): PctFieldRule {
+  const r: PctFieldRule = { mode, unit };
+  if (unit === "pips") {
+    if (maxVal != null) r.maxPipsFromEntry = maxVal;
+    if (minVal != null) r.minPipsFromEntry = minVal;
+  } else if (unit === "points") {
+    if (maxVal != null) r.maxPointsFromEntry = maxVal;
+    if (minVal != null) r.minPointsFromEntry = minVal;
+  } else {
+    if (maxVal != null) r.maxPctFromEntry = maxVal;
+    if (minVal != null) r.minPctFromEntry = minVal;
+  }
+  return r;
+}
+
+export function RiskDistanceInputs({
+  rule,
+  disabled,
+  onChange,
+  profile,
+  pctMax = 100,
+}: {
+  rule: PctFieldRule;
+  disabled: boolean;
+  onChange: (r: PctFieldRule) => void;
+  profile?: ValidatorProfile;
+  pctMax?: number;
+}) {
+  const unit: ToleranceUnit = rule.unit ?? "pct";
+  const limits = unit === "pct" ? { ...RISK_UNIT_LIMITS.pct, max: pctMax } : RISK_UNIT_LIMITS[unit];
+  const maxVal = getRiskValue(rule, unit, "max");
+  const minVal = getRiskValue(rule, unit, "min");
+
+  const handleUnitChange = (newUnit: ToleranceUnit) => {
+    onChange({ mode: rule.mode, unit: newUnit });
+  };
+
+  const handleChange = (kind: "max" | "min", v: number | undefined) => {
+    const nextMax = kind === "max" ? v : maxVal;
+    const nextMin = kind === "min" ? v : minVal;
+    onChange(buildRiskRule(rule.mode, unit, nextMax, nextMin));
+  };
+
+  const suffix = UNIT_SUFFIX[unit];
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <label className="flex items-center gap-1.5">
+          <span className="font-mono text-[.62rem] text-text-muted">Unit</span>
+          <select
+            value={unit}
+            disabled={disabled}
+            onChange={(e) => handleUnitChange(e.target.value as ToleranceUnit)}
+            className={selectCls}
+          >
+            {(Object.keys(UNIT_LABELS) as ToleranceUnit[]).map((u) => (
+              <option key={u} value={u}>{UNIT_LABELS[u]}</option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className="font-mono text-[.62rem] text-text-muted">Max from entry</span>
+          <input
+            type="number"
+            min={limits.min}
+            max={limits.max}
+            step={limits.step}
+            value={maxVal ?? ""}
+            disabled={disabled}
+            placeholder="max"
+            onChange={(e) => {
+              const s = e.target.value;
+              const v = s.trim() === "" ? undefined : parseFloat(s);
+              handleChange("max", isNaN(v as number) ? undefined : v);
+            }}
+            className={inputCls}
+          />
+          <span className="font-mono text-[.6rem] text-text-muted">{suffix}</span>
+        </label>
+        <label className="flex items-center gap-1.5">
+          <span className="font-mono text-[.62rem] text-text-muted">Min from entry</span>
+          <input
+            type="number"
+            min={limits.min}
+            max={limits.max}
+            step={limits.step}
+            value={minVal ?? ""}
+            disabled={disabled}
+            placeholder="optional"
+            onChange={(e) => {
+              const s = e.target.value;
+              const v = s.trim() === "" ? undefined : parseFloat(s);
+              handleChange("min", isNaN(v as number) ? undefined : v);
+            }}
+            className={inputCls}
+          />
+          <span className="font-mono text-[.6rem] text-text-muted">{suffix}</span>
+        </label>
+      </div>
+      {unit !== "pct" && (
+        <span className="font-mono text-[.56rem] text-text-disabled">
+          {unit === "pips" ? "FX / gold pip (e.g. 0.0001 for EURUSD)" : "Futures point (tick-based, e.g. ES = 0.25)"}
+        </span>
+      )}
+      {profile && (
+        <span className="font-mono text-[.56rem] text-text-disabled">{PROFILE_RISK_HINT[profile]}</span>
+      )}
+    </div>
+  );
+}
 
 export function ToleranceRow({
   label,

@@ -27,13 +27,18 @@ export type SizeUnit = "shares" | "lots" | "contracts" | "units";
 export type PriceBasis = "premium" | "spot" | "underlying" | null;
 export type ValidatorProfile = "equity" | "commodity" | "crypto" | "options";
 
-export type Platform = "telegram" | "discord";
+export type Platform = "telegram" | "discord" | "discord_account" | "twitter";
 
 // ── Per-field rules ───────────────────────────────────────────────────────────
 export interface PctFieldRule {
   mode: FieldMode;
+  unit?: ToleranceUnit;
   maxPctFromEntry?: number;
   minPctFromEntry?: number;
+  maxPipsFromEntry?: number;
+  minPipsFromEntry?: number;
+  maxPointsFromEntry?: number;
+  minPointsFromEntry?: number;
 }
 
 export interface LotSizeRule {

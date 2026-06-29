@@ -31,7 +31,7 @@ import { FIELD_DEFS, ORDER_TYPE_OPTIONS, ORDER_TYPE_LABELS, TOOLTIPS } from "./f
 import { InfoTip } from "./InfoTip";
 import { MessageFilterSection } from "./MessageFilterSection";
 import { SymbolFilterSection } from "./SymbolFilterSection";
-import { ToleranceRow } from "./ToleranceRow";
+import { RiskDistanceInputs, ToleranceRow } from "./ToleranceRow";
 
 // ── Defaults / normalisation ──────────────────────────────────────────────────
 export function buildDefaultFields(): ValidatorFields {
@@ -256,7 +256,7 @@ export default function ValidatorForm({
                     </td>
                     <td className="px-3 py-2 align-top">
                       {rule.mode === "manual" ? (
-                        <RuleInputs def={def} rule={rule} disabled={!manual} onChange={(v) => setField(def.key, v)} sizeUnit={sizeUnitLabelFor(profile)} />
+                        <RuleInputs def={def} rule={rule} disabled={!manual} onChange={(v) => setField(def.key, v)} sizeUnit={sizeUnitLabelFor(profile)} {...(profile != null ? { profile } : {})} />
                       ) : (
                         <span className="font-mono text-[.62rem] text-text-disabled">Use signal value</span>
                       )}
@@ -306,31 +306,23 @@ function RuleInputs({
   disabled,
   onChange,
   sizeUnit,
+  profile,
 }: {
   def: (typeof FIELD_DEFS)[number];
   rule: ValidatorFields[ValidatorFieldKey];
   disabled: boolean;
   onChange: (v: ValidatorFields[ValidatorFieldKey]) => void;
   sizeUnit?: string;
+  profile?: ValidatorProfile;
 }) {
   if (def.kind === "pct") {
-    const r = rule as PctFieldRule;
     return (
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <PctInput
-          label="Max % from entry"
-          tip={def.key === "sl" ? TOOLTIPS.maxPctSl : TOOLTIPS.maxPctTp}
-          value={r.maxPctFromEntry}
-          disabled={disabled}
-          onChange={(n) => onChange({ ...r, maxPctFromEntry: n })}
-        />
-        <PctInput
-          label="Min %"
-          value={r.minPctFromEntry}
-          disabled={disabled}
-          onChange={(n) => onChange({ ...r, minPctFromEntry: n })}
-        />
-      </div>
+      <RiskDistanceInputs
+        rule={rule as PctFieldRule}
+        disabled={disabled}
+        onChange={(r) => onChange(r)}
+        {...(profile != null ? { profile } : {})}
+      />
     );
   }
 
@@ -454,40 +446,6 @@ function RuleInputs({
 
   // "mode" kind — manual just means "use signal value", no extra inputs in v1.
   return <span className="font-mono text-[.62rem] text-text-muted">Use signal value</span>;
-}
-
-function PctInput({
-  label,
-  tip,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  tip?: string | undefined;
-  value?: number | undefined;
-  disabled: boolean;
-  onChange: (n: number | undefined) => void;
-}) {
-  const invalid = value != null && (value < 0 || value > 100);
-  return (
-    <label className="flex items-center gap-1.5">
-      <span className="inline-flex items-center gap-1 font-mono text-[.62rem] text-text-muted">
-        {label}
-        {tip && <InfoTip text={tip} />}
-      </span>
-      <input
-        type="number"
-        min={0}
-        max={100}
-        step="0.1"
-        value={value ?? ""}
-        disabled={disabled}
-        onChange={(e) => onChange(numOrUndef(e.target.value))}
-        className={`${inputCls} ${invalid ? "border-bear" : ""}`}
-      />
-    </label>
-  );
 }
 
 // ── Spread row ─────────────────────────────────────────────────────────────────
