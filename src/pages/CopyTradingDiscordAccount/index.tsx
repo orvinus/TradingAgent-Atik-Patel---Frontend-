@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { LuArrowLeft, LuLoader, LuMail, LuLock, LuRefreshCw, LuTriangle } from "react-icons/lu";
 import { discordSelfCopierApi } from "@/api/endpoints/discordSelfCopyTrading";
+import type { DiscordSelfDialog, DiscordSelfSource } from "@/types/discordSelfCopyTrading";
 import { qk } from "@/api/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { toast } from "@/components/ui/Toast";
@@ -418,7 +419,7 @@ export default function CopyTradingDiscordAccount() {
   // ── Channel picker ────────────────────────────────────────────────────────
 
   if (step === "channels") {
-    const dialogs = dialogsQuery.data ?? [];
+    const dialogs = normalizeDialogs(dialogsQuery.data);
     return (
       <div className="flex flex-col gap-6 p-6">
         <Back onClick={() => setStep("connected")} />
@@ -529,7 +530,21 @@ export default function CopyTradingDiscordAccount() {
 
   // ── Connected dashboard ───────────────────────────────────────────────────
 
-  const sources = sourcesQuery.data ?? [];
+  function normalizeDialogs(raw: unknown): DiscordSelfDialog[] {
+    if (Array.isArray(raw)) return raw as DiscordSelfDialog[];
+    const obj = raw as Record<string, unknown> | null | undefined;
+    if (obj && Array.isArray(obj.dialogs)) return obj.dialogs as DiscordSelfDialog[];
+    if (obj && Array.isArray(obj.channels)) return obj.channels as DiscordSelfDialog[];
+    return [];
+  }
+
+  function normalizeSources(raw: unknown): DiscordSelfSource[] {
+    if (Array.isArray(raw)) return raw as DiscordSelfSource[];
+    const obj = raw as Record<string, unknown> | null | undefined;
+    if (obj && Array.isArray(obj.sources)) return obj.sources as DiscordSelfSource[];
+    return [];
+  }
+  const sources = normalizeSources(sourcesQuery.data);
   const status = statusQuery.data;
   const displayName = status?.username ?? status?.globalName ?? status?.email ?? "Connected";
 

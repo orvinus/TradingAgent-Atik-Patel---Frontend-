@@ -44,13 +44,22 @@ export const discordSelfCopierApi = {
   },
 
   listDialogs: async (): Promise<DiscordSelfDialog[]> => {
-    const { data } = await apiClient.get<Envelope<DiscordSelfDialog[]>>(`${BASE}/dialogs`);
-    return data.data;
+    const { data } = await apiClient.get<Envelope<unknown>>(`${BASE}/dialogs`);
+    const d = data.data;
+    if (Array.isArray(d)) return d as DiscordSelfDialog[];
+    const obj = d as Record<string, unknown> | null | undefined;
+    if (obj && Array.isArray(obj.dialogs)) return obj.dialogs as DiscordSelfDialog[];
+    if (obj && Array.isArray(obj.channels)) return obj.channels as DiscordSelfDialog[];
+    return [];
   },
 
   listSources: async (): Promise<DiscordSelfSource[]> => {
-    const { data } = await apiClient.get<Envelope<DiscordSelfSource[]>>(`${BASE}/sources`);
-    return data.data;
+    const { data } = await apiClient.get<Envelope<unknown>>(`${BASE}/sources`);
+    const d = data.data;
+    if (Array.isArray(d)) return d as DiscordSelfSource[];
+    const obj = d as Record<string, unknown> | null | undefined;
+    if (obj && Array.isArray(obj.sources)) return obj.sources as DiscordSelfSource[];
+    return [];
   },
 
   addSource: async (channelId: string, guildId?: string): Promise<DiscordSelfSource> => {
