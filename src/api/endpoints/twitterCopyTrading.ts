@@ -57,8 +57,13 @@ export const twitterCopierApi = {
   },
 
   listSources: async (): Promise<TwitterSource[]> => {
-    const { data } = await apiClient.get<Envelope<TwitterSource[]>>(`${BASE}/sources`);
-    return data.data;
+    const { data } = await apiClient.get<Envelope<TwitterSource[] | { sources: TwitterSource[] }>>(`${BASE}/sources`);
+    const d = data.data;
+    if (Array.isArray(d)) return d;
+    if (d && Array.isArray((d as { sources?: TwitterSource[] }).sources)) {
+      return (d as { sources: TwitterSource[] }).sources;
+    }
+    return [];
   },
 
   addSource: async (body: {

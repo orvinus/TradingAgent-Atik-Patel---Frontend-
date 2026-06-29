@@ -12,6 +12,7 @@ import {
   LuTriangle,
 } from "react-icons/lu";
 import { twitterCopierApi } from "@/api/endpoints/twitterCopyTrading";
+import type { TwitterSource } from "@/types/twitterCopyTrading";
 import { qk } from "@/api/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { toast } from "@/components/ui/Toast";
@@ -531,7 +532,13 @@ export default function CopyTradingX() {
 
   // ── Connected dashboard ───────────────────────────────────────────────────
 
-  const sources = sourcesQuery.data ?? [];
+  function normalizeSources(raw: unknown): TwitterSource[] {
+    if (Array.isArray(raw)) return raw as TwitterSource[];
+    const obj = raw as Record<string, unknown> | null | undefined;
+    if (obj && Array.isArray(obj.sources)) return obj.sources as TwitterSource[];
+    return [];
+  }
+  const sources = normalizeSources(sourcesQuery.data);
   const status = statusQuery.data;
   const displayHandle = status?.handle ? `@${status.handle}` : (status?.displayName ?? "Connected");
   const sessionInvalid =
