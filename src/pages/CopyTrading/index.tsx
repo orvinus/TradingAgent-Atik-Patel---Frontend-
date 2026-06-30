@@ -228,7 +228,7 @@ export default function CopyTrading() {
         <ProviderCard
           icon="🐦"
           label="X (Twitter)"
-          subtitle="Cookie connect · polls every ~5 min"
+          subtitle="Cookie connect · polls every 1 min"
           configured={xConfigured}
           connected={xConnected}
           loading={xStatusQuery.isLoading}
