@@ -6,6 +6,8 @@ import axios from "axios";
 import { copyValidatorApi } from "@/api/endpoints/copyValidator";
 import { copyTradingApi } from "@/api/endpoints/copyTrading";
 import { discordCopierApi } from "@/api/endpoints/discordCopyTrading";
+import { discordSelfCopierApi } from "@/api/endpoints/discordSelfCopyTrading";
+import { twitterCopierApi } from "@/api/endpoints/twitterCopyTrading";
 import { qk } from "@/api/queryKeys";
 import { toast } from "@/components/ui/Toast";
 import type {
@@ -86,10 +88,19 @@ function ProfileBadge({ summary }: { summary?: SourceConfigSummary | undefined }
 
 // ── Main list ─────────────────────────────────────────────────────────────────
 
+const PLATFORM_LABEL: Record<Platform, string> = {
+  telegram:         "Telegram",
+  discord:          "Discord (Bot)",
+  discord_account:  "Discord (Account)",
+  twitter:          "X / Twitter",
+};
+
 export default function SourceOverrides({ options }: { options?: ValidatorOptions | undefined }) {
-  const tgSources = useQuery({ queryKey: qk.copyTradingSources(), queryFn: copyTradingApi.listSources });
-  const dcSources = useQuery({ queryKey: qk.discordSources(), queryFn: discordCopierApi.listSources });
-  const configs = useQuery({ queryKey: qk.copyValidatorSources(), queryFn: copyValidatorApi.listSourceConfigs });
+  const tgSources    = useQuery({ queryKey: qk.copyTradingSources(),   queryFn: copyTradingApi.listSources });
+  const dcSources    = useQuery({ queryKey: qk.discordSources(),       queryFn: discordCopierApi.listSources });
+  const dcSelfSources = useQuery({ queryKey: qk.discordSelfSources(),  queryFn: discordSelfCopierApi.listSources });
+  const xSources     = useQuery({ queryKey: qk.twitterSources(),       queryFn: twitterCopierApi.listSources });
+  const configs      = useQuery({ queryKey: qk.copyValidatorSources(), queryFn: copyValidatorApi.listSourceConfigs });
 
   const [editing, setEditing] = useState<Row | null>(null);
 
@@ -104,12 +115,22 @@ export default function SourceOverrides({ options }: { options?: ValidatorOption
       sourceId: s.id,
       title: [s.guildName, s.channelName].filter(Boolean).join(" / ") || s.channelId,
     })),
+    ...(dcSelfSources.data ?? []).map((s) => ({
+      platform: "discord_account" as const,
+      sourceId: s.id,
+      title: [s.guildName, s.channelName].filter(Boolean).join(" / ") || s.channelId,
+    })),
+    ...(xSources.data ?? []).map((s) => ({
+      platform: "twitter" as const,
+      sourceId: s.id,
+      title: s.displayName ? `${s.displayName} (@${s.handle ?? s.id})` : s.handle ? `@${s.handle}` : s.id,
+    })),
   ];
 
   const getSummary = (r: Row) =>
     (configs.data ?? []).find((c) => c.platform === r.platform && c.sourceId === r.sourceId);
 
-  const loading = tgSources.isLoading || dcSources.isLoading;
+  const loading = tgSources.isLoading || dcSources.isLoading || dcSelfSources.isLoading || xSources.isLoading;
 
   return (
     <div className="rounded-lg border border-border-subtle bg-bg-surface p-5 shadow-card">
@@ -124,7 +145,7 @@ export default function SourceOverrides({ options }: { options?: ValidatorOption
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-sm border border-border-subtle bg-bg-elevated px-3 py-2 font-mono text-[.63rem] text-text-muted">
-          No copied channels yet. Connect a Telegram or Discord channel first.
+          No copied channels yet. Connect a Telegram, Discord, or X source first.
         </div>
       ) : (
         <ul className="flex flex-col divide-y divide-border-subtle">
@@ -135,7 +156,7 @@ export default function SourceOverrides({ options }: { options?: ValidatorOption
                 <div className="min-w-0">
                   <div className="truncate font-mono text-[.68rem] text-text-primary">{r.title}</div>
                   <div className="font-mono text-[.56rem] uppercase tracking-[.16em] text-text-disabled">
-                    {r.platform}
+                    {PLATFORM_LABEL[r.platform] ?? r.platform}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -336,7 +357,7 @@ function OverrideModal({
           <div>
             <h3 className="font-display font-bold text-text-primary">Validation rules</h3>
             <p className="font-mono text-[.6rem] text-text-muted">
-              {row.title} · <span className="capitalize">{row.platform}</span>
+              {row.title} · {PLATFORM_LABEL[row.platform] ?? row.platform}
             </p>
           </div>
           <button

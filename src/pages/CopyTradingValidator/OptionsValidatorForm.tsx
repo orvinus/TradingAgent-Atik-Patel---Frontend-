@@ -20,7 +20,7 @@ import type {
 import { InfoTip } from "./InfoTip";
 import { MessageFilterSection } from "./MessageFilterSection";
 import { SymbolFilterSection } from "./SymbolFilterSection";
-import { ToleranceRow } from "./ToleranceRow";
+import { RiskDistanceInputs, ToleranceRow } from "./ToleranceRow";
 
 const inputCls =
   "w-20 rounded-sm border border-border-default bg-bg-base px-2 py-1 font-mono text-[.68rem] text-text-primary outline-none focus:border-accent disabled:opacity-40";
@@ -170,17 +170,18 @@ export default function OptionsValidatorForm({ config, onChange, suggestedMessag
               {/* SL */}
               <FieldRow
                 label="Stop loss"
-                tip="Max/min % of option premium. E.g. 50% means SL can't be more than 50% below the entry premium."
+                tip="Max/min distance from entry. Use % for option premium (e.g. 50% below entry premium)."
                 rule={(fields.sl as PctFieldRule) ?? { mode: "auto" }}
                 disabled={!manual}
                 onModeChange={(mode) => setField("sl", { ...((fields.sl as PctFieldRule) ?? {}), mode })}
               >
                 {(rule) => (
-                  <PctInputs
+                  <RiskDistanceInputs
                     rule={rule as PctFieldRule}
                     disabled={!manual}
                     onChange={(r) => setField("sl", r)}
-                    label="Max % from premium entry"
+                    profile="options"
+                    pctMax={500}
                   />
                 )}
               </FieldRow>
@@ -188,17 +189,18 @@ export default function OptionsValidatorForm({ config, onChange, suggestedMessag
               {/* TP */}
               <FieldRow
                 label="Take profit"
-                tip="Max/min % of option premium above the entry premium."
+                tip="Max/min distance from entry. Use % for option premium (e.g. 100% above entry premium)."
                 rule={(fields.tp as PctFieldRule) ?? { mode: "auto" }}
                 disabled={!manual}
                 onModeChange={(mode) => setField("tp", { ...((fields.tp as PctFieldRule) ?? {}), mode })}
               >
                 {(rule) => (
-                  <PctInputs
+                  <RiskDistanceInputs
                     rule={rule as PctFieldRule}
                     disabled={!manual}
                     onChange={(r) => setField("tp", r)}
-                    label="Max % from premium entry"
+                    profile="options"
+                    pctMax={500}
                   />
                 )}
               </FieldRow>
@@ -212,11 +214,12 @@ export default function OptionsValidatorForm({ config, onChange, suggestedMessag
                 onModeChange={(mode) => setField("tpLevels", { ...((fields.tpLevels as PctFieldRule) ?? {}), mode })}
               >
                 {(rule) => (
-                  <PctInputs
+                  <RiskDistanceInputs
                     rule={rule as PctFieldRule}
                     disabled={!manual}
                     onChange={(r) => setField("tpLevels", r)}
-                    label="Max % from premium entry"
+                    profile="options"
+                    pctMax={500}
                   />
                 )}
               </FieldRow>
@@ -364,45 +367,6 @@ function FieldRow({
         )}
       </td>
     </tr>
-  );
-}
-
-function PctInputs({
-  rule,
-  disabled,
-  onChange,
-  label,
-}: {
-  rule: PctFieldRule;
-  disabled: boolean;
-  onChange: (r: PctFieldRule) => void;
-  label: string;
-}) {
-  const updateMax = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = numOrUndef(e.target.value);
-    const next: PctFieldRule = { mode: rule.mode };
-    if (v != null) next.maxPctFromEntry = v;
-    if (rule.minPctFromEntry != null) next.minPctFromEntry = rule.minPctFromEntry;
-    onChange(next);
-  };
-  const updateMin = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = numOrUndef(e.target.value);
-    const next: PctFieldRule = { mode: rule.mode };
-    if (rule.maxPctFromEntry != null) next.maxPctFromEntry = rule.maxPctFromEntry;
-    if (v != null) next.minPctFromEntry = v;
-    onChange(next);
-  };
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <label className="flex items-center gap-1.5">
-        <span className="font-mono text-[.62rem] text-text-muted">{label}</span>
-        <input type="number" min={0} max={500} step="0.1" value={rule.maxPctFromEntry ?? ""} disabled={disabled} onChange={updateMax} className={inputCls} />
-      </label>
-      <label className="flex items-center gap-1.5">
-        <span className="font-mono text-[.62rem] text-text-muted">Min %</span>
-        <input type="number" min={0} max={500} step="0.1" value={rule.minPctFromEntry ?? ""} disabled={disabled} onChange={updateMin} className={inputCls} />
-      </label>
-    </div>
   );
 }
 

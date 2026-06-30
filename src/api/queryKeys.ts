@@ -227,6 +227,17 @@ export const qk = {
   discordSources:           ()                           => ["discord-copy", "sources"]            as const,
   discordInvite:            ()                           => ["discord-copy", "invite"]             as const,
 
+  // ── Copy Trading (Discord Self / Account) ─────────────────────────────
+  discordSelfConfig:        ()                           => ["discord-self", "config"]             as const,
+  discordSelfStatus:        ()                           => ["discord-self", "status"]             as const,
+  discordSelfDialogs:       ()                           => ["discord-self", "dialogs"]            as const,
+  discordSelfSources:       ()                           => ["discord-self", "sources"]            as const,
+
+  // ── Copy Trading (Twitter / X) ─────────────────────────────────────────
+  twitterConfig:            ()                           => ["twitter-copy", "config"]             as const,
+  twitterStatus:            ()                           => ["twitter-copy", "status"]             as const,
+  twitterSources:           ()                           => ["twitter-copy", "sources"]            as const,
+
   // ── Copy Trading Validator (risk / limits) ─────────────────────────────
   copyValidatorOptions:     ()                           => ["copy-validator", "options"]          as const,
   copyValidatorConfig:      ()                           => ["copy-validator", "config"]           as const,

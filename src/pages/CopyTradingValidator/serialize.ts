@@ -64,11 +64,19 @@ export function serializeConfig(c: NormalizedValidatorConfig): ValidatorConfigBo
 
     if (kind === "pct") {
       const r = rule as PctFieldRule;
-      fields[key] = {
-        mode: "manual",
-        ...(r.maxPctFromEntry != null ? { maxPctFromEntry: r.maxPctFromEntry } : {}),
-        ...(r.minPctFromEntry != null ? { minPctFromEntry: r.minPctFromEntry } : {}),
-      } as PctFieldRule;
+      const unit = r.unit ?? "pct";
+      const out: PctFieldRule = { mode: "manual", unit };
+      if (unit === "pips") {
+        if (r.maxPipsFromEntry != null) out.maxPipsFromEntry = r.maxPipsFromEntry;
+        if (r.minPipsFromEntry != null) out.minPipsFromEntry = r.minPipsFromEntry;
+      } else if (unit === "points") {
+        if (r.maxPointsFromEntry != null) out.maxPointsFromEntry = r.maxPointsFromEntry;
+        if (r.minPointsFromEntry != null) out.minPointsFromEntry = r.minPointsFromEntry;
+      } else {
+        if (r.maxPctFromEntry != null) out.maxPctFromEntry = r.maxPctFromEntry;
+        if (r.minPctFromEntry != null) out.minPctFromEntry = r.minPctFromEntry;
+      }
+      fields[key] = out;
     } else if (kind === "lotSize") {
       const r = rule as LotSizeRule;
       fields[key] =
@@ -104,14 +112,28 @@ export function validateConfig(c: NormalizedValidatorConfig): string[] {
     const kind = defKind.get(key);
     if (kind === "pct") {
       const r = rule as PctFieldRule;
-      for (const [lbl, v] of [
-        ["Max %", r.maxPctFromEntry],
-        ["Min %", r.minPctFromEntry],
-      ] as const) {
-        if (v != null && (v < 0 || v > 100)) errors.push(`${key}: ${lbl} must be between 0 and 100`);
-      }
-      if (r.maxPctFromEntry != null && r.minPctFromEntry != null && r.minPctFromEntry > r.maxPctFromEntry) {
-        errors.push(`${key}: Min % cannot exceed Max %`);
+      const unit = r.unit ?? "pct";
+      if (unit === "pips") {
+        for (const [lbl, v] of [["Max pips", r.maxPipsFromEntry], ["Min pips", r.minPipsFromEntry]] as const) {
+          if (v != null && (v < 0.1 || v > 5000)) errors.push(`${key}: ${lbl} must be between 0.1 and 5000`);
+        }
+        if (r.maxPipsFromEntry != null && r.minPipsFromEntry != null && r.minPipsFromEntry > r.maxPipsFromEntry) {
+          errors.push(`${key}: Min pips cannot exceed Max pips`);
+        }
+      } else if (unit === "points") {
+        for (const [lbl, v] of [["Max points", r.maxPointsFromEntry], ["Min points", r.minPointsFromEntry]] as const) {
+          if (v != null && (v < 0.1 || v > 50000)) errors.push(`${key}: ${lbl} must be between 0.1 and 50000`);
+        }
+        if (r.maxPointsFromEntry != null && r.minPointsFromEntry != null && r.minPointsFromEntry > r.maxPointsFromEntry) {
+          errors.push(`${key}: Min points cannot exceed Max points`);
+        }
+      } else {
+        for (const [lbl, v] of [["Max %", r.maxPctFromEntry], ["Min %", r.minPctFromEntry]] as const) {
+          if (v != null && (v < 0 || v > 100)) errors.push(`${key}: ${lbl} must be between 0 and 100`);
+        }
+        if (r.maxPctFromEntry != null && r.minPctFromEntry != null && r.minPctFromEntry > r.maxPctFromEntry) {
+          errors.push(`${key}: Min % cannot exceed Max %`);
+        }
       }
     } else if (kind === "lotSize") {
       const r = rule as LotSizeRule;
