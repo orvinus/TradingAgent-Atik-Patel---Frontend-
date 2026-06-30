@@ -3,6 +3,7 @@
 // but uses contractSize instead of lotSize, hides trailing stop, and uses
 // premium-based SL/TP tooltips.
 
+import { useState, useEffect } from "react";
 import type {
   ExecutionMode,
   FieldMode,
@@ -423,7 +424,13 @@ function ContractSizeInputs({
   disabled: boolean;
   onChange: (r: ContractSizeRule) => void;
 }) {
-  const sel: "max" | "fixed" = rule.fixedContracts != null ? "fixed" : "max";
+  const [sel, setSel] = useState<"max" | "fixed">(rule.fixedContracts != null ? "fixed" : "max");
+
+  // Sync when a saved config is loaded (non-null values are authoritative)
+  useEffect(() => {
+    if (rule.fixedContracts != null) setSel("fixed");
+    else if (rule.maxContracts != null) setSel("max");
+  }, [rule.fixedContracts, rule.maxContracts]);
 
   const buildRule = (maxC: number | undefined, fixedC: number | undefined, maxP?: number): ContractSizeRule => {
     const next: ContractSizeRule = { mode: rule.mode };
@@ -434,6 +441,16 @@ function ContractSizeInputs({
     return next;
   };
 
+  const selectMax = () => {
+    setSel("max");
+    onChange(buildRule(rule.maxContracts ?? rule.fixedContracts, undefined));
+  };
+
+  const selectFixed = () => {
+    setSel("fixed");
+    onChange(buildRule(undefined, rule.fixedContracts ?? rule.maxContracts));
+  };
+
   return (
     <div className="flex flex-col gap-2">
       <label className="flex items-center gap-2">
@@ -441,7 +458,7 @@ function ContractSizeInputs({
           type="radio"
           checked={sel === "max"}
           disabled={disabled}
-          onChange={() => onChange(buildRule(rule.maxContracts ?? rule.fixedContracts, undefined))}
+          onChange={selectMax}
           className="h-3.5 w-3.5 accent-[var(--color-accent)]"
         />
         <span className="font-mono text-[.65rem] text-text-secondary">Max contracts</span>
@@ -459,7 +476,7 @@ function ContractSizeInputs({
           type="radio"
           checked={sel === "fixed"}
           disabled={disabled}
-          onChange={() => onChange(buildRule(undefined, rule.fixedContracts ?? rule.maxContracts))}
+          onChange={selectFixed}
           className="h-3.5 w-3.5 accent-[var(--color-accent)]"
         />
         <span className="font-mono text-[.65rem] text-text-secondary">Fixed contracts</span>

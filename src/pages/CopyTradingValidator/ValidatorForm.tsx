@@ -3,6 +3,7 @@
 // Controlled config form shared by the global Validation & Limits page and the
 // per-source override modal. Renders execution mode, on-violation behaviour,
 // and the per-field rules table.
+import { useState, useEffect } from "react";
 import type {
   ExecutionMode,
   FieldMode,
@@ -300,6 +301,98 @@ function RadioRow({
   );
 }
 
+function LotSizeInputs({
+  rule,
+  disabled,
+  onChange,
+  sizeUnit,
+}: {
+  rule: LotSizeRule;
+  disabled: boolean;
+  onChange: (r: LotSizeRule) => void;
+  sizeUnit?: string;
+}) {
+  const unitLower = sizeUnit?.toLowerCase() ?? "lots";
+  const [sel, setSel] = useState<"max" | "fixed">(rule.fixedLots != null ? "fixed" : "max");
+
+  // Sync when a saved config is loaded (non-null values are authoritative)
+  useEffect(() => {
+    if (rule.fixedLots != null) setSel("fixed");
+    else if (rule.maxLots != null) setSel("max");
+  }, [rule.fixedLots, rule.maxLots]);
+
+  const selectMax = () => {
+    setSel("max");
+    const carry = rule.maxLots ?? rule.fixedLots;
+    const next: LotSizeRule = { mode: rule.mode };
+    if (carry != null) next.maxLots = carry;
+    onChange(next);
+  };
+
+  const selectFixed = () => {
+    setSel("fixed");
+    const carry = rule.fixedLots ?? rule.maxLots;
+    const next: LotSizeRule = { mode: rule.mode };
+    if (carry != null) next.fixedLots = carry;
+    onChange(next);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="flex items-center gap-2">
+        <input
+          type="radio"
+          checked={sel === "max"}
+          disabled={disabled}
+          onChange={selectMax}
+          className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+        />
+        <span className="inline-flex items-center gap-1 font-mono text-[.65rem] text-text-secondary">
+          Max {unitLower} allowed <InfoTip text={TOOLTIPS.maxLots} />
+        </span>
+        <input
+          type="number"
+          min={0}
+          value={sel === "max" ? rule.maxLots ?? "" : ""}
+          disabled={disabled || sel !== "max"}
+          onChange={(e) => {
+            const next: LotSizeRule = { mode: rule.mode };
+            const v = numOrUndef(e.target.value);
+            if (v != null) next.maxLots = v;
+            onChange(next);
+          }}
+          className={inputCls}
+        />
+      </label>
+      <label className="flex items-center gap-2">
+        <input
+          type="radio"
+          checked={sel === "fixed"}
+          disabled={disabled}
+          onChange={selectFixed}
+          className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+        />
+        <span className="inline-flex items-center gap-1 font-mono text-[.65rem] text-text-secondary">
+          Fixed {unitLower} (always) <InfoTip text={TOOLTIPS.fixedLots} />
+        </span>
+        <input
+          type="number"
+          min={0}
+          value={sel === "fixed" ? rule.fixedLots ?? "" : ""}
+          disabled={disabled || sel !== "fixed"}
+          onChange={(e) => {
+            const next: LotSizeRule = { mode: rule.mode };
+            const v = numOrUndef(e.target.value);
+            if (v != null) next.fixedLots = v;
+            onChange(next);
+          }}
+          className={inputCls}
+        />
+      </label>
+    </div>
+  );
+}
+
 function RuleInputs({
   def,
   rule,
@@ -327,52 +420,13 @@ function RuleInputs({
   }
 
   if (def.kind === "lotSize") {
-    const r = rule as LotSizeRule;
-    const sel: "max" | "fixed" = r.fixedLots != null ? "fixed" : "max";
-    const unitLower = sizeUnit?.toLowerCase() ?? "lots";
     return (
-      <div className="flex flex-col gap-2">
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            checked={sel === "max"}
-            disabled={disabled}
-            onChange={() => onChange({ mode: r.mode, maxLots: r.maxLots ?? r.fixedLots, fixedLots: undefined })}
-            className="h-3.5 w-3.5 accent-[var(--color-accent)]"
-          />
-          <span className="inline-flex items-center gap-1 font-mono text-[.65rem] text-text-secondary">
-            Max {unitLower} allowed <InfoTip text={TOOLTIPS.maxLots} />
-          </span>
-          <input
-            type="number"
-            min={0}
-            value={sel === "max" ? r.maxLots ?? "" : ""}
-            disabled={disabled || sel !== "max"}
-            onChange={(e) => onChange({ mode: r.mode, maxLots: numOrUndef(e.target.value), fixedLots: undefined })}
-            className={inputCls}
-          />
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            checked={sel === "fixed"}
-            disabled={disabled}
-            onChange={() => onChange({ mode: r.mode, fixedLots: r.fixedLots ?? r.maxLots, maxLots: undefined })}
-            className="h-3.5 w-3.5 accent-[var(--color-accent)]"
-          />
-          <span className="inline-flex items-center gap-1 font-mono text-[.65rem] text-text-secondary">
-            Fixed {unitLower} (always) <InfoTip text={TOOLTIPS.fixedLots} />
-          </span>
-          <input
-            type="number"
-            min={0}
-            value={sel === "fixed" ? r.fixedLots ?? "" : ""}
-            disabled={disabled || sel !== "fixed"}
-            onChange={(e) => onChange({ mode: r.mode, fixedLots: numOrUndef(e.target.value), maxLots: undefined })}
-            className={inputCls}
-          />
-        </label>
-      </div>
+      <LotSizeInputs
+        rule={rule as LotSizeRule}
+        disabled={disabled}
+        onChange={(r) => onChange(r)}
+        {...(sizeUnit != null ? { sizeUnit } : {})}
+      />
     );
   }
 
