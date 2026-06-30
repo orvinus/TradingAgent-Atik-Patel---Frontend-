@@ -209,7 +209,7 @@ export default function CopyTradingOpenTradeDetail() {
                   {formatDate(ev.createdAt)}
                 </span>
                 <span className="font-mono text-[.6rem] uppercase tracking-widest text-accent shrink-0">
-                  {ev.eventType.replace(/_/g, " ")}
+                  {String(ev.eventType ?? (ev as unknown as Record<string, unknown>)["event_type"] ?? "").replace(/_/g, " ")}
                 </span>
                 <span className="font-mono text-[.63rem] text-text-secondary">{ev.summary ?? "—"}</span>
               </div>

@@ -122,11 +122,11 @@ function ReviewCard({ item }: { item: ReviewQueueItem }) {
       </div>
 
       {/* Violations */}
-      {item.violations.length > 0 && (
+      {(item.violations ?? []).length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {item.violations.map((v, i) => (
+          {(item.violations ?? []).map((v, i) => (
             <span key={i} className="rounded-sm border border-bear/30 bg-bear/5 px-1.5 py-0.5 font-mono text-[.55rem] text-bear">
-              {v}
+              {typeof v === "string" ? v : (v as { message?: string }).message ?? JSON.stringify(v)}
             </span>
           ))}
         </div>
