@@ -43,8 +43,8 @@ export const copyValidatorApi = {
     return unwrap<ValidatorConfigResponse>(data);
   },
 
-  updateConfig: async (body: ValidatorConfigBody): Promise<ValidatorConfig> => {
-    const { data } = await apiClient.put(`${BASE}/config`, body);
+  updateConfig: async (body: ValidatorConfigBody, profile?: ValidatorProfile): Promise<ValidatorConfig> => {
+    const { data } = await apiClient.put(`${BASE}/config`, body, { params: profile ? { profile } : undefined });
     const d = unwrap<{ config?: ValidatorConfig } & ValidatorConfig>(data);
     return (d?.config ?? d ?? body) as ValidatorConfig;
   },

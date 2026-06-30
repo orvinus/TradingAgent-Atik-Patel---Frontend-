@@ -42,19 +42,19 @@ export default function CopyTradingValidator() {
   // ── Per-profile queries ──────────────────────────────────────────────────────
   const equityConfigQuery = useQuery({
     queryKey: qk.copyValidatorConfigProfile("equity"),
-    queryFn: () => copyValidatorApi.getConfig("equity"),
+    queryFn: () => copyValidatorApi.getConfigWithProfile("equity"),
   });
   const commodityConfigQuery = useQuery({
     queryKey: qk.copyValidatorConfigProfile("commodity"),
-    queryFn: () => copyValidatorApi.getConfig("commodity"),
+    queryFn: () => copyValidatorApi.getConfigWithProfile("commodity"),
   });
   const cryptoConfigQuery = useQuery({
     queryKey: qk.copyValidatorConfigProfile("crypto"),
-    queryFn: () => copyValidatorApi.getConfig("crypto"),
+    queryFn: () => copyValidatorApi.getConfigWithProfile("crypto"),
   });
   const optionsConfigQuery = useQuery({
     queryKey: qk.copyValidatorConfigProfile("options"),
-    queryFn: () => copyValidatorApi.getConfig("options"),
+    queryFn: () => copyValidatorApi.getConfigWithProfile("options"),
   });
 
   // ── Per-profile local state ──────────────────────────────────────────────────
@@ -63,42 +63,43 @@ export default function CopyTradingValidator() {
   const [cryptoConfig, setCryptoConfig] = useState<NormalizedValidatorConfig>(normalizeConfig());
   const [optionsConfig, setOptionsConfig] = useState<Required<ProfileConfig>>(normalizeOptionsConfig());
 
-  const extractProfile = (data: unknown, profile: ValidatorProfile): ProfileConfig | undefined => {
-    const d = data as { profiles?: Record<string, ProfileConfig>; effectiveConfig?: ProfileConfig } | undefined;
-    return d?.effectiveConfig ?? d?.profiles?.[profile] ?? (data as ProfileConfig | undefined);
+  const extractProfile = (data: unknown): ProfileConfig | undefined => {
+    const d = data as { savedProfileConfig?: ProfileConfig; effectiveConfig?: ProfileConfig } | undefined;
+    return d?.savedProfileConfig ?? d?.effectiveConfig;
   };
 
   useEffect(() => {
     if (equityConfigQuery.data) {
-      const p = extractProfile(equityConfigQuery.data, "equity");
-      setEquityConfig(normalizeConfig(p ?? equityConfigQuery.data));
+      const p = extractProfile(equityConfigQuery.data);
+      setEquityConfig(normalizeConfig(p));
     }
   }, [equityConfigQuery.data]);
 
   useEffect(() => {
     if (commodityConfigQuery.data) {
-      const p = extractProfile(commodityConfigQuery.data, "commodity");
-      setCommodityConfig(normalizeConfig(p ?? commodityConfigQuery.data));
+      const p = extractProfile(commodityConfigQuery.data);
+      setCommodityConfig(normalizeConfig(p));
     }
   }, [commodityConfigQuery.data]);
 
   useEffect(() => {
     if (cryptoConfigQuery.data) {
-      const p = extractProfile(cryptoConfigQuery.data, "crypto");
-      setCryptoConfig(normalizeConfig(p ?? cryptoConfigQuery.data));
+      const p = extractProfile(cryptoConfigQuery.data);
+      setCryptoConfig(normalizeConfig(p));
     }
   }, [cryptoConfigQuery.data]);
 
   useEffect(() => {
     if (optionsConfigQuery.data) {
-      const p = extractProfile(optionsConfigQuery.data, "options");
-      setOptionsConfig(normalizeOptionsConfig(p as ProfileConfig));
+      const p = extractProfile(optionsConfigQuery.data);
+      setOptionsConfig(normalizeOptionsConfig(p));
     }
   }, [optionsConfigQuery.data]);
 
   // ── Save mutation ────────────────────────────────────────────────────────────
   const saveMut = useMutation({
-    mutationFn: (body: ValidatorConfigBody) => copyValidatorApi.updateConfig(body),
+    mutationFn: ({ body, profile }: { body: ValidatorConfigBody; profile: ValidatorProfile }) =>
+      copyValidatorApi.updateConfig(body, profile),
     onSuccess: () => {
       toast.success("Validation settings saved");
       qc.invalidateQueries({ queryKey: qk.copyValidatorConfigProfile(activeTab) });
@@ -108,18 +109,21 @@ export default function CopyTradingValidator() {
 
   const onSave = () => {
     if (activeTab === "options") {
+      const symInc = optionsConfig.symbolFilter?.include?.trim() ?? "";
+      const symExc = optionsConfig.symbolFilter?.exclude?.trim() ?? "";
+      const msgInc = optionsConfig.messageFilter?.include?.trim() ?? "";
+      const msgExc = optionsConfig.messageFilter?.exclude?.trim() ?? "";
       saveMut.mutate({
-        profiles: {
-          options: {
-            executionMode: optionsConfig.executionMode,
-            onViolation: optionsConfig.onViolation,
-            fields: optionsConfig.fields,
-            ...(optionsConfig.symbolFilter && (optionsConfig.symbolFilter.include || optionsConfig.symbolFilter.exclude)
-              ? { symbolFilter: optionsConfig.symbolFilter }
-              : {}),
-            ...(optionsConfig.messageFilter && (optionsConfig.messageFilter.include || optionsConfig.messageFilter.exclude)
-              ? { messageFilter: optionsConfig.messageFilter }
-              : {}),
+        profile: "options",
+        body: {
+          profiles: {
+            options: {
+              executionMode: optionsConfig.executionMode,
+              onViolation: optionsConfig.onViolation,
+              fields: optionsConfig.fields,
+              symbolFilter: { ...(symInc ? { include: symInc } : {}), ...(symExc ? { exclude: symExc } : {}) },
+              messageFilter: { ...(msgInc ? { include: msgInc } : {}), ...(msgExc ? { exclude: msgExc } : {}) },
+            },
           },
         },
       });
@@ -129,7 +133,7 @@ export default function CopyTradingValidator() {
     const cfg = activeTab === "equity" ? equityConfig : activeTab === "commodity" ? commodityConfig : cryptoConfig;
     const errs = validateConfig(cfg);
     if (errs.length) { toast.error(errs[0] ?? "Please fix the highlighted rules."); return; }
-    saveMut.mutate({ profiles: { [activeTab]: serializeConfig(cfg) } });
+    saveMut.mutate({ body: { profiles: { [activeTab]: serializeConfig(cfg) } }, profile: activeTab });
   };
 
   const activeQuery = {

@@ -190,6 +190,7 @@ export interface NormalizedValidatorConfig {
 export interface ValidatorConfigResponse {
   config: ValidatorConfig;
   profile?: ValidatorProfile;
+  savedProfileConfig?: ProfileConfig;
   effectiveConfig?: ProfileConfig;
   profiles?: {
     equity?: ProfileConfig;
