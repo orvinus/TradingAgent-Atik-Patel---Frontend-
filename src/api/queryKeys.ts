@@ -255,6 +255,21 @@ export const qk = {
   missingFieldsSource:      (platform: string, sourceId: string) =>
                                                             ["missing-fields", "sources", platform, sourceId] as const,
 
+  // ── Copy Trading Signals ────────────────────────────────────────────────
+  copyTradingSignals:       (params?: string)            => ["copy-trading", "signals", params ?? "all"] as const,
+  copyTradingSignalSummary: (id: string)                 => ["copy-trading", "signals", id, "summary"] as const,
+  copyTradingSignalThread:  (id: string)                 => ["copy-trading", "signals", id, "thread"] as const,
+
+  // ── Trade Threads (Phase 2) ──────────────────────────────────────────────
+  tradeThreadsList:         (status?: string)            => ["trade-threads", "list", status ?? "all"] as const,
+  tradeThread:              (id: string)                 => ["trade-threads", id]                   as const,
+  tradeThreadState:         (id: string)                 => ["trade-threads", id, "state"]          as const,
+  tradeThreadEvents:        (id: string)                 => ["trade-threads", id, "events"]         as const,
+
+  // ── Review Queue (V2.2) ───────────────────────────────────────────────────
+  reviewQueueList:          (status?: string)            => ["review-queue", "list", status ?? "pending"] as const,
+  reviewQueuePendingCount:  ()                           => ["review-queue", "pending-count"]       as const,
+
   // ── Copy Trading Orders ─────────────────────────────────────────────────
   copyOrdersSettings:       ()                           => ["copy-orders", "settings"]            as const,
   copyOrdersBrokers:        ()                           => ["copy-orders", "brokers"]             as const,

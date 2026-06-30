@@ -53,6 +53,39 @@ export interface TelegramSource {
   signalsCount: number;
 }
 
+// ── Lifecycle / Phase 0 ─────────────────────────────────────────────────────
+export type SignalMessageType =
+  | "new_entry"
+  | "commentary"
+  | "partial_exit"
+  | "full_exit"
+  | "adjust_sl"
+  | "noise";
+
+export type ModActionOp =
+  | "open_order"
+  | "take_profit_hit"
+  | "close_partial"
+  | "close_full"
+  | "close_all"
+  | "move_sl_breakeven"
+  | "set_sl"
+  | "update_tp"
+  | "stop_loss_hit"
+  | "cancel_order"
+  | "reenter"
+  | "order_triggered"
+  | "scale_in";
+
+export interface ModAction {
+  op: ModActionOp;
+  tp_index?: number | null;
+  exit_pct?: number | null;
+  new_sl_price?: number | null;
+  new_tp_price?: number | null;
+  confidence: number;
+}
+
 export interface CopyParserSignal {
   parseable: boolean;
   symbol: string | null;
@@ -64,6 +97,58 @@ export interface CopyParserSignal {
   parser_confidence: number;
   raw_text: string;
   reason: string | null;
+  // Lifecycle (Phase 0)
+  message_type?: SignalMessageType | null;
+  lifecycle_summary?: string | null;
+  thread_key?: string | null;
+  exit_pct?: number | null;
+  reference_price?: number | null;
+  asset_class?: string | null;
+  strike?: number | null;
+  expiry?: string | null;
+  // V2 classification
+  mod_actions?: ModAction[] | null;
+  mod_action_labels?: string[] | null;
+  primary_mod_op?: ModActionOp | null;
+  link_method?: string | null;
+  link_confidence?: number | null;
+  scope_hint?: "single" | "channel" | null;
+  setup_ref?: string | null;
+  tp_index?: number | null;
+  action_confidence?: number | null;
+}
+
+// Signal summary from GET /signals/:id/summary
+export interface SignalSummary {
+  parseable: boolean;
+  messageType: SignalMessageType | null;
+  threadKey: string | null;
+  exitPct: number | null;
+  referencePrice: number | null;
+  lifecycleSummary: string | null;
+  summary: string | null;
+  confidence?: number | null;
+  reason?: string | null;
+  modActions?: ModAction[] | null;
+  modActionLabels?: string[] | null;
+  primaryModOp?: ModActionOp | null;
+  linkMethod?: string | null;
+  linkConfidence?: number | null;
+  scopeHint?: "single" | "channel" | null;
+  setupRef?: string | null;
+  tpIndex?: number | null;
+  actionConfidence?: number | null;
+}
+
+// Signal thread from GET /signals/:id/thread
+export interface SignalThread {
+  threadKey: string;
+  threadMessages: ParsedSignalRow[];
+  channelContext: ParsedSignalRow[];
+  summary: {
+    messageType: SignalMessageType | null;
+    lifecycleSummary: string | null;
+  };
 }
 
 export interface ParsedSignalRow {

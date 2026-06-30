@@ -239,6 +239,65 @@ export default function CopyTrading() {
         />
       </div>
 
+      {/* ── Live trading ─────────────────────────────────────────────────────── */}
+      <div className="mt-2">
+        <div className="mb-1 font-mono text-[.58rem] uppercase tracking-[.18em] text-text-disabled">
+          Live trading
+        </div>
+        <p className="mb-3 font-mono text-[.63rem] text-text-muted">
+          View incoming signals, active positions, and management orders.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <button
+            onClick={() => navigate(ROUTES.COPY_TRADING_SIGNALS)}
+            className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-bg-surface p-5 text-left shadow-card transition-colors hover:border-accent/50"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold text-text-primary">Signal Inbox</h2>
+              <span className="text-lg">📨</span>
+            </div>
+            <p className="font-mono text-[.63rem] text-text-muted">
+              All lifecycle messages — entries, updates, partial exits, closes, and SL adjustments.
+            </p>
+            <span className="mt-1 font-mono text-[.62rem] uppercase tracking-widest text-accent">
+              View signals →
+            </span>
+          </button>
+
+          <button
+            onClick={() => navigate(ROUTES.COPY_TRADING_OPEN_TRADES)}
+            className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-bg-surface p-5 text-left shadow-card transition-colors hover:border-accent/50"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold text-text-primary">Open Trades</h2>
+              <span className="text-lg">📊</span>
+            </div>
+            <p className="font-mono text-[.63rem] text-text-muted">
+              Trade threads — live position progress, partial fills, and broker sync.
+            </p>
+            <span className="mt-1 font-mono text-[.62rem] uppercase tracking-widest text-accent">
+              View positions →
+            </span>
+          </button>
+
+          <button
+            onClick={() => navigate(ROUTES.COPY_TRADING_REVIEW_QUEUE)}
+            className="flex flex-col gap-2 rounded-lg border border-border-subtle bg-bg-surface p-5 text-left shadow-card transition-colors hover:border-accent/50"
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="font-display font-bold text-text-primary">Review Queue</h2>
+              <span className="text-lg">⚠️</span>
+            </div>
+            <p className="font-mono text-[.63rem] text-text-muted">
+              Ambiguous or low-confidence signals held for human review before execution.
+            </p>
+            <span className="mt-1 font-mono text-[.62rem] uppercase tracking-widest text-accent">
+              Review now →
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* ── Rules & execution ─────────────────────────────────────────────── */}
       <div className="mt-2">
         <div className="mb-1 font-mono text-[.58rem] uppercase tracking-[.18em] text-text-disabled">
@@ -273,7 +332,7 @@ export default function CopyTrading() {
               <span className="text-lg">⚡</span>
             </div>
             <p className="font-mono text-[.63rem] text-text-muted">
-              Pick a broker connection and choose auto-submit or manual confirm. Review pending and past copy orders.
+              Pick a broker connection, choose auto-submit or manual confirm. Applies to entry and management exit orders.
             </p>
             <span className="mt-1 font-mono text-[.62rem] uppercase tracking-widest text-accent">
               Manage orders →

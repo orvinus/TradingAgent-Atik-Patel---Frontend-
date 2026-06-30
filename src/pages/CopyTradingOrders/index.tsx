@@ -10,12 +10,15 @@ import { ROUTES } from "@/constants/routes";
 import { toast } from "@/components/ui/Toast";
 import { InstrumentBadge } from "@/components/copy-trading/InstrumentBadge";
 import { EntryTypeBadge } from "@/components/copy-trading/EntryTypeBadge";
+import { OrderRoleBadge } from "@/components/copy-trading/OrderRoleBadge";
+import { ExitConfirmModal } from "@/components/copy-trading/ExitConfirmModal";
 import { formatSizeLabel, mapErrorCode } from "@/utils/copyTradingFormatters";
 import type {
   CopyOrder,
   CopyOrderStatus,
   OrderBrokerConnection,
   OrderExecutionMode,
+  OrderRole,
   OrderSettings,
   SizingConfig,
   SizingMode,
@@ -118,6 +121,7 @@ export default function CopyTradingOrders() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<CopyOrderStatus | "all">("all");
+  const [roleFilter, setRoleFilter] = useState<OrderRole | "all">("all");
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const settingsQuery = useQuery({ queryKey: qk.copyOrdersSettings(), queryFn: copyOrdersApi.getSettings });
@@ -205,9 +209,12 @@ export default function CopyTradingOrders() {
     refetchInterval: 10000,
   });
 
-  const orders = ordersQuery.data ?? [];
+  const allOrders = ordersQuery.data ?? [];
+  const orders = roleFilter === "all"
+    ? allOrders
+    : allOrders.filter((o) => (o.orderRole ?? "entry") === roleFilter);
 
-  useEffect(() => { setPage(1); }, [statusFilter]);
+  useEffect(() => { setPage(1); }, [statusFilter, roleFilter]);
 
   const PAGE_SIZE = 20;
   const pageOrders = orders.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -302,13 +309,13 @@ export default function CopyTradingOrders() {
                   checked={settings.orderExecutionMode === "auto"}
                   onSelect={() => setSettings({ ...settings, orderExecutionMode: "auto" as OrderExecutionMode })}
                   label="Auto order"
-                  hint="Submit to broker immediately."
+                  hint="Submit entry and exit (partial/close) orders without confirmation."
                 />
                 <ExecRadio
                   checked={settings.orderExecutionMode === "manual_confirm"}
                   onSelect={() => setSettings({ ...settings, orderExecutionMode: "manual_confirm" as OrderExecutionMode })}
                   label="Manual confirm"
-                  hint="Show me details first — I click to confirm."
+                  hint="Require confirmation for both entries and management exits."
                 />
               </div>
             </fieldset>
@@ -365,9 +372,19 @@ export default function CopyTradingOrders() {
       <div className="rounded-lg border border-border-subtle bg-bg-surface p-5 shadow-card">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-display font-bold text-text-primary">Orders</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as CopyOrderStatus | "all")} className={selectCls}>
               {STATUS_FILTERS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+            <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value as OrderRole | "all")} className={selectCls}>
+              <option value="all">All roles</option>
+              <option value="entry">Entry</option>
+              <option value="partial_exit">Partial Exit</option>
+              <option value="full_exit">Close</option>
+              <option value="adjust_sl">Adjust SL</option>
+              <option value="update_tp">Update TP</option>
+              <option value="cancel">Cancel</option>
+              <option value="reenter">Re-entry</option>
             </select>
             <button
               onClick={() => ordersQuery.refetch()}
@@ -392,7 +409,7 @@ export default function CopyTradingOrders() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border-subtle text-left">
-                    {["Time", "Type", "Instrument", "Side", "Size", "Entry", "SL", "Status", "Notes", ""].map((h) => (
+                    {["Time", "Role", "Type", "Instrument", "Side", "Size", "Entry", "SL", "Status", "Notes", ""].map((h) => (
                       <th key={h} className="px-3 py-2 font-mono text-[.54rem] uppercase tracking-[.14em] text-text-muted whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -432,7 +449,14 @@ export default function CopyTradingOrders() {
         )}
       </div>
 
-      {confirmId && <ConfirmOrderModal orderId={confirmId} onClose={() => setConfirmId(null)} />}
+      {confirmId && (() => {
+        const o = (ordersQuery.data ?? []).find((x) => x.id === confirmId);
+        // Management exit/adjust_sl orders use ExitConfirmModal; entry orders use ConfirmOrderModal
+        if (o && o.orderRole && o.orderRole !== "entry") {
+          return <ExitConfirmModal order={o} onClose={() => setConfirmId(null)} />;
+        }
+        return <ConfirmOrderModal orderId={confirmId} onClose={() => setConfirmId(null)} />;
+      })()}
     </div>
   );
 }
@@ -449,16 +473,28 @@ function OrderRow({ order, onConfirm }: { order: CopyOrder; onConfirm: () => voi
     ? [p?.underlying_symbol ?? p?.symbol, p?.strike ? `$${p.strike}` : null, p?.option_type ? (p.option_type === "call" ? "C" : "P") : null].filter(Boolean).join(" ")
     : p?.symbol ?? "—";
 
+  // For management orders, show management summary as notes
+  const ma = order.managementAction;
   const notes = order.errorMessage
     ? mapErrorCode(order.errorCode, order.errorMessage)
-    : order.brokerOrderId
-      ? `#${order.brokerOrderId.slice(0, 8)}`
-      : p?.summary ?? "—";
+    : ma?.lifecycleSummary
+      ? ma.lifecycleSummary
+      : order.brokerOrderId
+        ? `#${order.brokerOrderId.slice(0, 8)}`
+        : p?.summary ?? "—";
+
+  // Fill details
+  const fillText = order.filledQty != null
+    ? `${order.filledQty} filled${order.avgFillPrice != null ? ` @ $${order.avgFillPrice}` : ""}`
+    : null;
 
   return (
     <tr className="border-b border-border-subtle last:border-0 hover:bg-bg-elevated/40">
       <td className="whitespace-nowrap px-3 py-2 font-mono text-[.62rem] text-text-muted">
         {new Date(order.createdAt).toLocaleString()}
+      </td>
+      <td className="px-3 py-2">
+        <OrderRoleBadge role={order.orderRole} />
       </td>
       <td className="px-3 py-2">
         <InstrumentBadge profile={profile ?? "equity"} />
@@ -470,7 +506,10 @@ function OrderRow({ order, onConfirm }: { order: CopyOrder; onConfirm: () => voi
         </span>
       </td>
       <td className="px-3 py-2 font-mono text-[.63rem] text-text-secondary whitespace-nowrap">
-        {formatSizeLabel(p?.qty ?? p?.lot_size, p?.size_unit)}
+        {ma?.sellQty != null
+          ? formatSizeLabel(ma.sellQty, p?.size_unit)
+          : formatSizeLabel(p?.qty ?? p?.lot_size, p?.size_unit)}
+        {fillText && <span className="ml-1 text-bull text-[.56rem]">· {fillText}</span>}
       </td>
       <td className="px-3 py-2">
         <div className="flex flex-col gap-0.5">
@@ -489,7 +528,9 @@ function OrderRow({ order, onConfirm }: { order: CopyOrder; onConfirm: () => voi
         </div>
       </td>
       <td className="px-3 py-2 font-mono text-[.63rem] text-bear">
-        {p?.sl_price != null ? `$${p.sl_price}` : "—"}
+        {ma?.newSlPrice != null
+          ? <span><span className="line-through text-text-disabled">${ma.previousSlPrice ?? "?"}</span> → <span className="text-bull">${ma.newSlPrice}</span></span>
+          : p?.sl_price != null ? `$${p.sl_price}` : "—"}
       </td>
       <td className="px-3 py-2">
         <span className={`rounded-sm border px-2 py-0.5 font-mono text-[.52rem] uppercase tracking-widest ${STATUS_STYLE[order.status] ?? "text-text-muted"}`}>

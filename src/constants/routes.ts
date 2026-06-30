@@ -27,6 +27,10 @@ export const ROUTES = {
   COPY_TRADING_VALIDATOR:       "/copy-trading/validator",
   COPY_TRADING_MISSING_FIELDS:  "/copy-trading/missing-fields",
   COPY_TRADING_ORDERS:          "/copy-trading/orders",
+  COPY_TRADING_SIGNALS:         "/copy-trading/signals",
+  COPY_TRADING_OPEN_TRADES:     "/copy-trading/open-trades",
+  COPY_TRADING_OPEN_TRADE:      (id: string) => `/copy-trading/open-trades/${id}`,
+  COPY_TRADING_REVIEW_QUEUE:    "/copy-trading/review-queue",
   LOGIN:                        "/login",
 } as const;
 

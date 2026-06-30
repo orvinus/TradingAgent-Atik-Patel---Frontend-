@@ -32,6 +32,9 @@ const CopyTradingMissingFields    = lazy(() => import("@/pages/CopyTradingMissin
 const CopyTradingOrders           = lazy(() => import("@/pages/CopyTradingOrders/index"));
 const CopyTradingDiscordAccount   = lazy(() => import("@/pages/CopyTradingDiscordAccount/index"));
 const CopyTradingX                = lazy(() => import("@/pages/CopyTradingX/index"));
+const CopyTradingSignals          = lazy(() => import("@/pages/CopyTradingSignals/index"));
+const CopyTradingOpenTrades       = lazy(() => import("@/pages/CopyTradingOpenTrades/index"));
+const CopyTradingReviewQueue      = lazy(() => import("@/pages/CopyTradingReviewQueue/index"));
 
 const Login           = lazy(() => import("@/pages/Login/index"));
 const Signup          = lazy(() => import("@/pages/Signup/index"));
@@ -165,6 +168,10 @@ export const router = createBrowserRouter([
       { path: "/copy-trading/validator",            element: <Page component={CopyTradingValidator}      /> },
       { path: "/copy-trading/missing-fields",       element: <Page component={CopyTradingMissingFields}  /> },
       { path: "/copy-trading/orders",               element: <Page component={CopyTradingOrders}         /> },
+      { path: "/copy-trading/signals",              element: <Page component={CopyTradingSignals}        /> },
+      { path: "/copy-trading/open-trades",          element: <Page component={CopyTradingOpenTrades}     /> },
+      { path: "/copy-trading/open-trades/:id",      element: <Page component={CopyTradingOpenTrades}     /> },
+      { path: "/copy-trading/review-queue",         element: <Page component={CopyTradingReviewQueue}    /> },
     ],
   },
 
