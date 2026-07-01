@@ -10,6 +10,7 @@ import {
   LuChevronUp,
   LuRefreshCw,
   LuTriangle,
+  LuSearch,
 } from "react-icons/lu";
 import { twitterCopierApi } from "@/api/endpoints/twitterCopyTrading";
 import type { TwitterSource } from "@/types/twitterCopyTrading";
@@ -161,6 +162,7 @@ export default function CopyTradingX() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmStop, setConfirmStop] = useState<string | null>(null);
+  const [sourcesSearch, setSourcesSearch] = useState("");
 
   // Add source form
   const [kind, setKind] = useState<SourceKind>("account");
@@ -539,6 +541,15 @@ export default function CopyTradingX() {
     return [];
   }
   const sources = normalizeSources(sourcesQuery.data);
+  const sq = sourcesSearch.toLowerCase();
+  const filteredSources = sq
+    ? sources.filter(
+        (s) =>
+          (s.handle ?? "").toLowerCase().includes(sq) ||
+          (s.displayName ?? "").toLowerCase().includes(sq) ||
+          (s.listId ?? "").toLowerCase().includes(sq),
+      )
+    : sources;
   const status = statusQuery.data;
   const displayHandle = status?.handle ? `@${status.handle}` : (status?.displayName ?? "Connected");
   const sessionInvalid =
@@ -741,83 +752,96 @@ export default function CopyTradingX() {
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
-            {sources.map((source, i) => {
-              const isLast = i === sources.length - 1;
-              const isStopping = removeSource.isPending && removeSource.variables === source.id;
-
-              const label =
-                source.kind === "account"
-                  ? `@${source.handle ?? source.displayName}`
-                  : source.kind === "list"
-                  ? `List ${source.listId}`
-                  : "Home Timeline";
-
-              return (
-                <div
-                  key={source.id}
-                  className={`flex items-center justify-between px-4 py-3 ${
-                    !isLast ? "border-b border-border-subtle" : ""
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-[.72rem] text-text-primary">
-                      {source.kind === "account"
-                        ? "🐦"
-                        : source.kind === "list"
-                        ? "📋"
-                        : "🏠"}{" "}
-                      {label}
-                    </p>
-                    <div className="flex items-center gap-3">
-                      {source.signalsCount !== undefined && (
-                        <p className="font-mono text-[.6rem] text-text-disabled">
-                          {source.signalsCount} signal{source.signalsCount !== 1 ? "s" : ""}
+          <>
+            <div className="relative">
+              <LuSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                value={sourcesSearch}
+                onChange={(e) => setSourcesSearch(e.target.value)}
+                placeholder="Search sources…"
+                className="w-full rounded-sm border border-border-default bg-bg-elevated py-2 pl-8 pr-3 font-mono text-[.7rem] text-text-primary placeholder-text-disabled focus:border-accent focus:outline-none"
+              />
+            </div>
+            {filteredSources.length === 0 ? (
+              <p className="font-mono text-[.65rem] text-text-muted">No sources match your search.</p>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
+                {filteredSources.map((source, i) => {
+                  const isLast = i === filteredSources.length - 1;
+                  const isStopping = removeSource.isPending && removeSource.variables === source.id;
+                  const label =
+                    source.kind === "account"
+                      ? `@${source.handle ?? source.displayName}`
+                      : source.kind === "list"
+                      ? `List ${source.listId}`
+                      : "Home Timeline";
+                  return (
+                    <div
+                      key={source.id}
+                      className={`flex items-center justify-between px-4 py-3 ${
+                        !isLast ? "border-b border-border-subtle" : ""
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-mono text-[.72rem] text-text-primary">
+                          {source.kind === "account"
+                            ? "🐦"
+                            : source.kind === "list"
+                            ? "📋"
+                            : "🏠"}{" "}
+                          {label}
                         </p>
-                      )}
-                      {source.lastItemAt && (
-                        <p className="font-mono text-[.6rem] text-text-disabled">
-                          Last: {new Date(source.lastItemAt).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="ml-4 flex-shrink-0">
-                    {confirmStop === source.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[.58rem] text-text-muted">Sure?</span>
-                        <button
-                          onClick={() => removeSource.mutate(source.id)}
-                          disabled={isStopping}
-                          className="rounded-sm bg-bear px-2 py-1 font-mono text-[.58rem] text-white hover:opacity-80 disabled:opacity-50"
-                        >
-                          {isStopping ? (
-                            <LuLoader className="h-2.5 w-2.5 animate-spin" />
-                          ) : (
-                            "Stop"
+                        <div className="flex items-center gap-3">
+                          {source.signalsCount !== undefined && (
+                            <p className="font-mono text-[.6rem] text-text-disabled">
+                              {source.signalsCount} signal{source.signalsCount !== 1 ? "s" : ""}
+                            </p>
                           )}
-                        </button>
-                        <button
-                          onClick={() => setConfirmStop(null)}
-                          className="font-mono text-[.58rem] text-text-muted hover:text-text-secondary"
-                        >
-                          No
-                        </button>
+                          {source.lastItemAt && (
+                            <p className="font-mono text-[.6rem] text-text-disabled">
+                              Last: {new Date(source.lastItemAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmStop(source.id)}
-                        className="rounded-sm border border-bear/50 px-2.5 py-1 font-mono text-[.62rem] text-bear transition-colors hover:bg-bear/10"
-                      >
-                        Stop
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                      <div className="ml-4 flex-shrink-0">
+                        {confirmStop === source.id ? (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[.58rem] text-text-muted">Sure?</span>
+                            <button
+                              onClick={() => removeSource.mutate(source.id)}
+                              disabled={isStopping}
+                              className="rounded-sm bg-bear px-2 py-1 font-mono text-[.58rem] text-white hover:opacity-80 disabled:opacity-50"
+                            >
+                              {isStopping ? (
+                                <LuLoader className="h-2.5 w-2.5 animate-spin" />
+                              ) : (
+                                "Stop"
+                              )}
+                            </button>
+                            <button
+                              onClick={() => setConfirmStop(null)}
+                              className="font-mono text-[.58rem] text-text-muted hover:text-text-secondary"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmStop(source.id)}
+                            className="rounded-sm border border-bear/50 px-2.5 py-1 font-mono text-[.62rem] text-bear transition-colors hover:bg-bear/10"
+                          >
+                            Stop
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

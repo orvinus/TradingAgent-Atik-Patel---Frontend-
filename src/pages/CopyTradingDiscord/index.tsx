@@ -11,6 +11,7 @@ import {
   LuHash,
   LuRefreshCw,
   LuInfo,
+  LuSearch,
 } from "react-icons/lu";
 import { discordCopierApi } from "@/api/endpoints/discordCopyTrading";
 import { qk } from "@/api/queryKeys";
@@ -88,6 +89,8 @@ export default function CopyTradingDiscord() {
   const [confirmStop, setConfirmStop] = useState<string | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideFocus, setGuideFocus] = useState<GuideFocus>("both");
+  const [guildSearch, setGuildSearch] = useState("");
+  const [channelSearch, setChannelSearch] = useState("");
 
   function openGuide(focus: GuideFocus = "both") {
     setGuideFocus(focus);
@@ -341,6 +344,12 @@ export default function CopyTradingDiscord() {
   const channels = channelsQuery.data ?? [];
   const selectedGuild = guilds.find((g) => g.id === selectedGuildId);
 
+  const guildQ = guildSearch.toLowerCase();
+  const allGuilds = [...botPresentGuilds, ...noBotGuilds];
+  const filteredAllGuilds = guildQ ? allGuilds.filter((g) => g.name.toLowerCase().includes(guildQ)) : allGuilds;
+  const channelQ = channelSearch.toLowerCase();
+  const filteredChannels = channelQ ? channels.filter((c) => c.name.toLowerCase().includes(channelQ)) : channels;
+
   return (
     <div className="flex flex-col gap-6 p-6">
       {guideOpen && (
@@ -444,57 +453,72 @@ export default function CopyTradingDiscord() {
             No servers found. Make sure you share a server with the bot.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
-            {/* Servers with bot first, then without */}
-            {[...botPresentGuilds, ...noBotGuilds].map((guild, i, arr) => {
-              const isLast = i === arr.length - 1;
-              const isSelected = selectedGuildId === guild.id;
-              return (
-                <div
-                  key={guild.id}
-                  className={`flex items-center justify-between px-4 py-3 transition-colors ${
-                    !isLast ? "border-b border-border-subtle" : ""
-                  } ${
-                    guild.botPresent
-                      ? "cursor-pointer hover:bg-bg-elevated"
-                      : "opacity-50 cursor-not-allowed"
-                  } ${isSelected ? "bg-bg-elevated" : ""}`}
-                  onClick={() => guild.botPresent && setSelectedGuildId(guild.id)}
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <LuServer className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
-                    <div className="min-w-0">
-                      <p className="truncate font-mono text-[.72rem] text-text-primary">{guild.name}</p>
-                      <p className="font-mono text-[.6rem] text-text-disabled">
-                        {guild.botPresent ? "Bot present" : "Bot not added — invite first"}
-                      </p>
+          <>
+            <div className="relative">
+              <LuSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                value={guildSearch}
+                onChange={(e) => setGuildSearch(e.target.value)}
+                placeholder="Search servers…"
+                className="w-full rounded-sm border border-border-default bg-bg-elevated py-2 pl-8 pr-3 font-mono text-[.7rem] text-text-primary placeholder-text-disabled focus:border-accent focus:outline-none"
+              />
+            </div>
+            {filteredAllGuilds.length === 0 ? (
+              <p className="font-mono text-[.65rem] text-text-muted">No servers match your search.</p>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
+                {filteredAllGuilds.map((guild, i) => {
+                  const isLast = i === filteredAllGuilds.length - 1;
+                  const isSelected = selectedGuildId === guild.id;
+                  return (
+                    <div
+                      key={guild.id}
+                      className={`flex items-center justify-between px-4 py-3 transition-colors ${
+                        !isLast ? "border-b border-border-subtle" : ""
+                      } ${
+                        guild.botPresent
+                          ? "cursor-pointer hover:bg-bg-elevated"
+                          : "opacity-50 cursor-not-allowed"
+                      } ${isSelected ? "bg-bg-elevated" : ""}`}
+                      onClick={() => { if (guild.botPresent) { setSelectedGuildId(guild.id); setChannelSearch(""); } }}
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <LuServer className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
+                        <div className="min-w-0">
+                          <p className="truncate font-mono text-[.72rem] text-text-primary">{guild.name}</p>
+                          <p className="font-mono text-[.6rem] text-text-disabled">
+                            {guild.botPresent ? "Bot present" : "Bot not added — invite first"}
+                          </p>
+                        </div>
+                      </div>
+                      {isSelected && (
+                        <span className="ml-3 flex-shrink-0 font-mono text-[.6rem] text-accent">
+                          Selected
+                        </span>
+                      )}
+                      {!guild.botPresent && (
+                        <div className="ml-3 flex flex-shrink-0 items-center gap-2">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleInviteBot(); }}
+                            className="font-mono text-[.6rem] text-accent underline hover:no-underline"
+                          >
+                            Invite bot
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openGuide("part1"); }}
+                            className="font-mono text-[.6rem] text-text-muted underline hover:no-underline"
+                          >
+                            Setup guide
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  {isSelected && (
-                    <span className="ml-3 flex-shrink-0 font-mono text-[.6rem] text-accent">
-                      Selected
-                    </span>
-                  )}
-                  {!guild.botPresent && (
-                    <div className="ml-3 flex flex-shrink-0 items-center gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleInviteBot(); }}
-                        className="font-mono text-[.6rem] text-accent underline hover:no-underline"
-                      >
-                        Invite bot
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openGuide("part1"); }}
-                        className="font-mono text-[.6rem] text-text-muted underline hover:no-underline"
-                      >
-                        Setup guide
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -524,65 +548,80 @@ export default function CopyTradingDiscord() {
               No readable channels found. Check bot channel permissions.
             </p>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
-              {channels.map((channel, i) => {
-                const isLast = i === channels.length - 1;
-                const alreadyCopied = activeSources.some((s) => s.channelId === channel.id);
-                const isAdding =
-                  addSource.isPending &&
-                  addSource.variables?.channelId === channel.id;
-                return (
-                  <div
-                    key={channel.id}
-                    className={`flex items-center justify-between px-4 py-3 ${
-                      !isLast ? "border-b border-border-subtle" : ""
-                    } ${!channel.botCanRead ? "opacity-40" : ""}`}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                      <LuHash className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
-                      <div className="min-w-0">
-                        <p className="truncate font-mono text-[.72rem] text-text-primary">
-                          {channel.name}
-                        </p>
-                        <p className="font-mono text-[.6rem] text-text-disabled">
-                          {channel.type}
-                          {!channel.botCanRead && " · bot cannot read this channel"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="ml-4 flex flex-shrink-0 items-center gap-2">
-                      {!channel.botCanRead && !alreadyCopied && (
-                        <button
-                          onClick={() => openGuide("part2")}
-                          className="font-mono text-[.6rem] text-text-muted underline hover:no-underline"
-                        >
-                          Setup guide
-                        </button>
-                      )}
-                      {alreadyCopied ? (
-                        <span className="font-mono text-[.62rem] text-bull">Copying</span>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            addSource.mutate({ guildId: selectedGuildId, channelId: channel.id })
-                          }
-                          disabled={!channel.botCanRead || isAdding}
-                          title={!channel.botCanRead ? DISCORD_ERROR_MESSAGES.DISCORD_CHANNEL_NO_ACCESS : undefined}
-                          className="rounded-sm bg-accent px-2.5 py-1 font-mono text-[.62rem] font-bold text-bg-base transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {isAdding ? (
-                            <LuLoader className="h-2.5 w-2.5 animate-spin" />
-                          ) : (
-                            "Copy"
+            <>
+              <div className="relative">
+                <LuSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+                <input
+                  type="text"
+                  value={channelSearch}
+                  onChange={(e) => setChannelSearch(e.target.value)}
+                  placeholder="Search channels…"
+                  className="w-full rounded-sm border border-border-default bg-bg-elevated py-2 pl-8 pr-3 font-mono text-[.7rem] text-text-primary placeholder-text-disabled focus:border-accent focus:outline-none"
+                />
+              </div>
+              {filteredChannels.length === 0 ? (
+                <p className="font-mono text-[.65rem] text-text-muted">No channels match your search.</p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
+                  {filteredChannels.map((channel, i) => {
+                    const isLast = i === filteredChannels.length - 1;
+                    const alreadyCopied = activeSources.some((s) => s.channelId === channel.id);
+                    const isAdding =
+                      addSource.isPending &&
+                      addSource.variables?.channelId === channel.id;
+                    return (
+                      <div
+                        key={channel.id}
+                        className={`flex items-center justify-between px-4 py-3 ${
+                          !isLast ? "border-b border-border-subtle" : ""
+                        } ${!channel.botCanRead ? "opacity-40" : ""}`}
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <LuHash className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
+                          <div className="min-w-0">
+                            <p className="truncate font-mono text-[.72rem] text-text-primary">
+                              {channel.name}
+                            </p>
+                            <p className="font-mono text-[.6rem] text-text-disabled">
+                              {channel.type}
+                              {!channel.botCanRead && " · bot cannot read this channel"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="ml-4 flex flex-shrink-0 items-center gap-2">
+                          {!channel.botCanRead && !alreadyCopied && (
+                            <button
+                              onClick={() => openGuide("part2")}
+                              className="font-mono text-[.6rem] text-text-muted underline hover:no-underline"
+                            >
+                              Setup guide
+                            </button>
                           )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                          {alreadyCopied ? (
+                            <span className="font-mono text-[.62rem] text-bull">Copying</span>
+                          ) : (
+                            <button
+                              onClick={() =>
+                                addSource.mutate({ guildId: selectedGuildId, channelId: channel.id })
+                              }
+                              disabled={!channel.botCanRead || isAdding}
+                              title={!channel.botCanRead ? DISCORD_ERROR_MESSAGES.DISCORD_CHANNEL_NO_ACCESS : undefined}
+                              className="rounded-sm bg-accent px-2.5 py-1 font-mono text-[.62rem] font-bold text-bg-base transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isAdding ? (
+                                <LuLoader className="h-2.5 w-2.5 animate-spin" />
+                              ) : (
+                                "Copy"
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
