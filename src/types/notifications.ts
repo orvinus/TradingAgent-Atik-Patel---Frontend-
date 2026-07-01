@@ -2,6 +2,7 @@
 
 export type NotificationProvider = "telegram" | "discord";
 export type NotificationKind = "general" | "alert" | "trade" | "system";
+export type NotificationSource = "discord" | "telegram" | "twitter";
 export type NotificationChannel = "platform" | "telegram" | "discord";
 export type DeliveryStatus = "sent" | "failed" | "skipped" | "pending";
 

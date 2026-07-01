@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { LuLoader, LuBell, LuCheck, LuChevronLeft, LuChevronRight } from "react-icons/lu";
 import { useNotificationInbox, useMarkAsRead, useMarkAllRead, NOTIFICATIONS_PAGE_SIZE } from "@/features/notifications/hooks/useNotificationInbox";
-import type { InboxItem, NotificationKind, DeliveryStatus, NotificationChannel } from "@/types/notifications";
+import type { InboxItem, NotificationKind, NotificationSource, DeliveryStatus, NotificationChannel } from "@/types/notifications";
 
 const KIND_LABELS: Record<NotificationKind, string> = {
   general: "General",
@@ -33,6 +33,26 @@ function formatDate(iso: string) {
   });
 }
 
+function deriveSource(metadata: Record<string, unknown>): string | null {
+  const platform = metadata.platform as string | undefined;
+  if (platform === "discord") return "Discord";
+  if (platform === "telegram") return "Telegram";
+  const source = metadata.source as string | undefined;
+  if (!source) return null;
+  if (source.startsWith("discord")) return "Discord";
+  if (source.startsWith("telegram")) return "Telegram";
+  if (source.startsWith("twitter")) return "Twitter";
+  return null;
+}
+
+function SourceBadge({ label }: { label: string }) {
+  return (
+    <span className="rounded-sm border border-border-subtle px-1.5 py-0.5 font-mono text-[.55rem] uppercase tracking-[.12em] text-text-muted">
+      {label}
+    </span>
+  );
+}
+
 function KindBadge({ kind }: { kind: NotificationKind }) {
   const colors: Record<NotificationKind, string> = {
     alert:   "border-bear/40 text-bear bg-bear/10",
@@ -50,6 +70,7 @@ function KindBadge({ kind }: { kind: NotificationKind }) {
 function NotificationRow({ item, onRead }: { item: InboxItem; onRead: (id: string) => void }) {
   const title = item.title ?? (KIND_LABELS[item.kind] ?? item.kind);
   const unread = !item.isRead;
+  const sourceLabel = deriveSource(item.metadata);
 
   return (
     <div
@@ -62,6 +83,7 @@ function NotificationRow({ item, onRead }: { item: InboxItem; onRead: (id: strin
             {title}
           </p>
           <KindBadge kind={item.kind} />
+          {sourceLabel && <SourceBadge label={sourceLabel} />}
           {item.audienceType === "broadcast" && (
             <span className="rounded-sm border border-border-subtle px-1.5 py-0.5 font-mono text-[.55rem] uppercase tracking-[.12em] text-text-muted">
               Everyone
@@ -116,16 +138,19 @@ export default function Notifications() {
   const [page, setPage] = useState(0);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [kindFilter, setKindFilter] = useState<NotificationKind | "">("");
+  const [sourceFilter, setSourceFilter] = useState<NotificationSource | "">("");
 
   const offset = page * NOTIFICATIONS_PAGE_SIZE;
-  const { data, isLoading, isFetching, error, refetch } = useNotificationInbox(offset, unreadOnly);
+  const { data, isLoading, isFetching, error, refetch } = useNotificationInbox(
+    offset,
+    unreadOnly,
+    kindFilter || undefined,
+    sourceFilter || undefined,
+  );
   const markRead = useMarkAsRead();
   const markAll = useMarkAllRead();
 
-  const rawItems = data?.items ?? [];
-  const items = kindFilter
-    ? rawItems.filter((i) => i.kind === kindFilter)
-    : rawItems;
+  const items = data?.items ?? [];
   const hasMore = data?.hasMore ?? false;
 
   return (
@@ -165,10 +190,20 @@ export default function Notifications() {
           onChange={(e) => { setKindFilter(e.target.value as NotificationKind | ""); setPage(0); }}
           className="rounded-sm border border-border-default bg-bg-elevated px-2.5 py-1 font-mono text-[.65rem] text-text-secondary focus:border-accent focus:outline-none"
         >
-          <option value="">All kinds</option>
+          <option value="">Kind: All</option>
           {(["general", "alert", "trade", "system"] as NotificationKind[]).map((k) => (
             <option key={k} value={k}>{KIND_LABELS[k]}</option>
           ))}
+        </select>
+        <select
+          value={sourceFilter}
+          onChange={(e) => { setSourceFilter(e.target.value as NotificationSource | ""); setPage(0); }}
+          className="rounded-sm border border-border-default bg-bg-elevated px-2.5 py-1 font-mono text-[.65rem] text-text-secondary focus:border-accent focus:outline-none"
+        >
+          <option value="">Source: All</option>
+          <option value="discord">Discord</option>
+          <option value="telegram">Telegram</option>
+          <option value="twitter">Twitter (X)</option>
         </select>
       </div>
 
@@ -192,7 +227,7 @@ export default function Notifications() {
           <div className="flex flex-col items-center gap-2 p-12 text-center">
             <LuBell className="h-8 w-8 text-border-default" />
             <p className="font-mono text-[.7rem] uppercase tracking-[.12em] text-text-muted">
-              {unreadOnly ? "No unread notifications." : "You're all caught up."}
+              {unreadOnly || kindFilter || sourceFilter ? "No notifications match these filters." : "You're all caught up."}
             </p>
           </div>
         ) : (
