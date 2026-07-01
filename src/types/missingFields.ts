@@ -111,6 +111,20 @@ export interface MissingFieldsPreviewResponse {
   configUsed?: Record<string, unknown>;
 }
 
+// ── Options-specific config ───────────────────────────────────────────────────
+
+export interface ContractSizeFieldConfig {
+  whenMissing: WhenMissing;
+  defaultContracts?: number;
+}
+
+export interface OptionsMissingFieldsApiConfig {
+  entry?: EntryFieldConfig;
+  sl?: SlFieldConfig;
+  tp?: TpFieldConfig;
+  contractSize?: ContractSizeFieldConfig;
+}
+
 // ── Source override ───────────────────────────────────────────────────────────
 
 export interface MissingFieldsSourceConfig {

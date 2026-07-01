@@ -6,6 +6,7 @@ import type {
   MissingFieldsOptions,
   MissingFieldsPreviewResponse,
   MissingFieldsSourceConfig,
+  OptionsMissingFieldsApiConfig,
 } from "@/types/missingFields";
 
 function unwrap<T = unknown>(body: unknown): T {
@@ -46,6 +47,16 @@ export const missingFieldsApi = {
 
   updateCryptoConfig: async (cryptoMissingFields: MissingFieldsConfig): Promise<void> => {
     await apiClient.put(`${BASE}/config`, { cryptoMissingFields });
+  },
+
+  getOptionsConfig: async (): Promise<OptionsMissingFieldsApiConfig> => {
+    const { data } = await apiClient.get(`${BASE}/config`, { params: { profile: "options" } });
+    const d = unwrap<{ effectiveMissingFields?: OptionsMissingFieldsApiConfig }>(data);
+    return d?.effectiveMissingFields ?? {};
+  },
+
+  updateOptionsConfig: async (optionsMissingFields: OptionsMissingFieldsApiConfig): Promise<void> => {
+    await apiClient.put(`${BASE}/config`, { optionsMissingFields });
   },
 
   preview: async (body: {
