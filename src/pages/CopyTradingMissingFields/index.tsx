@@ -242,6 +242,7 @@ export default function CopyTradingMissingFields() {
                         sl: { whenMissing: "use_default", defaultPctFromEntry: "20" },
                         tp: { whenMissing: "allow_empty", priceMode: "pct", defaultPctFromEntry: "", fixed: "", multiTp: false, tpLevels: [{ pctFromEntry: "", exit_pct: "" }] },
                         contractSize: { whenMissing: "use_default", defaultContracts: "1" },
+                        exitQty: { whenMissing: "use_default", defaultExitPct: "50" },
                       })
                     }
                     className="rounded-sm border border-border-default px-2.5 py-1 font-mono text-[.6rem] text-text-secondary hover:border-purple-400 hover:text-purple-400"
@@ -255,6 +256,7 @@ export default function CopyTradingMissingFields() {
                         sl: { whenMissing: "reject", defaultPctFromEntry: "" },
                         tp: { whenMissing: "reject", priceMode: "pct", defaultPctFromEntry: "", fixed: "", multiTp: false, tpLevels: [{ pctFromEntry: "", exit_pct: "" }] },
                         contractSize: { whenMissing: "reject", defaultContracts: "" },
+                        exitQty: { whenMissing: "reject", defaultExitPct: "" },
                       })
                     }
                     className="rounded-sm border border-border-default px-2.5 py-1 font-mono text-[.6rem] text-text-secondary hover:border-bear hover:text-bear"

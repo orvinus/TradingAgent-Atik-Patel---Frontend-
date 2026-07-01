@@ -8,11 +8,13 @@ import type {
   TpFieldConfig,
   LotSizeFieldConfig,
   EntryFieldConfig,
+  ExitQtyFieldConfig,
   WhenMissing,
   EntryWhenMissing,
+  ExitQtyWhenMissing,
 } from "@/types/missingFields";
 
-export type { EntryWhenMissing };
+export type { EntryWhenMissing, ExitQtyWhenMissing };
 
 export type PriceMode = "pct" | "fixed";
 
@@ -47,11 +49,17 @@ export interface LotFormState {
   lots: string;
 }
 
+export interface ExitQtyFormState {
+  whenMissing: ExitQtyWhenMissing;
+  defaultExitPct: string;
+}
+
 export interface MissingFieldsFormState {
   entry: EntryFormState;
   sl: SlFormState;
   tp: TpFormState;
   lotSize: LotFormState;
+  exitQty: ExitQtyFormState;
 }
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -61,6 +69,7 @@ export const DEFAULT_FORM_STATE: MissingFieldsFormState = {
   sl: { whenMissing: "reject", priceMode: "pct", pct: "", fixed: "" },
   tp: { whenMissing: "reject", priceMode: "pct", pct: "", fixed: "", multiTp: false, tpLevels: [{ pctFromEntry: "", exit_pct: "" }] },
   lotSize: { whenMissing: "reject", lots: "" },
+  exitQty: { whenMissing: "use_default", defaultExitPct: "50" },
 };
 
 // ── Deserialize API → form state ──────────────────────────────────────────────
@@ -70,6 +79,7 @@ export function deserializeConfig(cfg: Partial<MissingFieldsConfig>): MissingFie
   const sl = cfg.sl ?? ({ whenMissing: "reject" } as SlFieldConfig);
   const tp = cfg.tp ?? ({ whenMissing: "reject" } as TpFieldConfig);
   const lot = cfg.lotSize ?? ({ whenMissing: "reject" } as LotSizeFieldConfig);
+  const exitQty = cfg.exitQty ?? ({ whenMissing: "use_default", defaultExitPct: 50 } as ExitQtyFieldConfig);
 
   return {
     entry: {
@@ -97,6 +107,10 @@ export function deserializeConfig(cfg: Partial<MissingFieldsConfig>): MissingFie
     lotSize: {
       whenMissing: lot.whenMissing,
       lots: lot.defaultLots != null ? String(lot.defaultLots) : "",
+    },
+    exitQty: {
+      whenMissing: exitQty.whenMissing,
+      defaultExitPct: exitQty.defaultExitPct != null ? String(exitQty.defaultExitPct) : "50",
     },
   };
 }
@@ -156,7 +170,13 @@ export function serializeConfig(form: MissingFieldsFormState): MissingFieldsConf
     if (lots !== undefined) lotSize.defaultLots = lots;
   }
 
-  return { entry, sl, tp, lotSize };
+  const exitQty: ExitQtyFieldConfig = { whenMissing: form.exitQty.whenMissing };
+  if (form.exitQty.whenMissing === "use_default") {
+    const pct = n(form.exitQty.defaultExitPct);
+    if (pct !== undefined) exitQty.defaultExitPct = pct;
+  }
+
+  return { entry, sl, tp, lotSize, exitQty };
 }
 
 // ── Client-side validation ────────────────────────────────────────────────────
@@ -209,6 +229,12 @@ export function validateForm(form: MissingFieldsFormState): string[] {
     const v = num(form.lotSize.lots);
     if (!form.lotSize.lots || isNaN(v) || v <= 0)
       errors.push("Default lots must be a positive number.");
+  }
+
+  if (form.exitQty.whenMissing === "use_default") {
+    const v = num(form.exitQty.defaultExitPct);
+    if (!form.exitQty.defaultExitPct || isNaN(v) || v < 1 || v > 100)
+      errors.push("Default sell % is required (1–100).");
   }
 
   return errors;

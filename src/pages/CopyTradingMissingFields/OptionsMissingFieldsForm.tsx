@@ -3,7 +3,7 @@
 // SL/TP are premium-based; TP supports single % / fixed price / Multi-TP levels.
 
 import { LuPlus, LuTrash2 } from "react-icons/lu";
-import type { WhenMissing, EntryWhenMissing } from "@/types/missingFields";
+import type { WhenMissing, EntryWhenMissing, ExitQtyWhenMissing } from "@/types/missingFields";
 import type { OptionsMissingFieldsApiConfig } from "@/types/missingFields";
 
 const selectCls =
@@ -49,6 +49,10 @@ export interface OptionsMissingFieldsFormState {
     whenMissing: WhenMissing;
     defaultContracts: string;
   };
+  exitQty: {
+    whenMissing: ExitQtyWhenMissing;
+    defaultExitPct: string;
+  };
 }
 
 export const DEFAULT_OPTIONS_FORM_STATE: OptionsMissingFieldsFormState = {
@@ -63,6 +67,7 @@ export const DEFAULT_OPTIONS_FORM_STATE: OptionsMissingFieldsFormState = {
     tpLevels: [{ pctFromEntry: "", exit_pct: "" }],
   },
   contractSize: { whenMissing: "use_default", defaultContracts: "1" },
+  exitQty: { whenMissing: "use_default", defaultExitPct: "50" },
 };
 
 // ── Deserialize API → form state ──────────────────────────────────────────────
@@ -102,6 +107,10 @@ export function deserializeOptionsConfig(
         mf?.contractSize?.defaultContracts != null
           ? String(mf.contractSize.defaultContracts)
           : "1",
+    },
+    exitQty: {
+      whenMissing: mf?.exitQty?.whenMissing ?? "use_default",
+      defaultExitPct: mf?.exitQty?.defaultExitPct != null ? String(mf.exitQty.defaultExitPct) : "50",
     },
   };
 }
@@ -159,7 +168,15 @@ export function serializeOptionsConfig(form: OptionsMissingFieldsFormState): Opt
     if (v !== undefined) contractSize.defaultContracts = v;
   }
 
-  return { entry, sl, tp, contractSize };
+  const exitQty: NonNullable<OptionsMissingFieldsApiConfig["exitQty"]> = {
+    whenMissing: form.exitQty.whenMissing,
+  };
+  if (form.exitQty.whenMissing === "use_default") {
+    const v = n(form.exitQty.defaultExitPct);
+    if (v !== undefined) exitQty.defaultExitPct = v;
+  }
+
+  return { entry, sl, tp, contractSize, exitQty };
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -206,6 +223,12 @@ export function validateOptionsForm(form: OptionsMissingFieldsFormState): string
     const v = num(form.contractSize.defaultContracts);
     if (!form.contractSize.defaultContracts || isNaN(v) || v < 1 || !Number.isInteger(v))
       errors.push("Default contracts must be a whole number ≥ 1.");
+  }
+
+  if (form.exitQty.whenMissing === "use_default") {
+    const v = num(form.exitQty.defaultExitPct);
+    if (!form.exitQty.defaultExitPct || isNaN(v) || v < 1 || v > 100)
+      errors.push("Default sell % is required (1–100).");
   }
 
   return errors;
@@ -559,6 +582,56 @@ export default function OptionsMissingFieldsForm({
             Note: this is contract count, NOT lots or shares. 1 contract = 100 shares of the
             underlying.
           </p>
+        </div>
+
+        {/* ── Sell quantity / exit % ────────────────────────────────────────── */}
+        <div className="pt-6">
+          <div className="mb-3">
+            <h3 className="font-mono text-[.72rem] font-bold uppercase tracking-[.12em] text-text-primary">
+              Sell quantity / exit %
+            </h3>
+            <p className="mt-0.5 font-mono text-[.6rem] text-text-muted">
+              For securing/trim messages without % or contract count (e.g. &ldquo;SECURING FCEL at
+              36.00&rdquo;). Applies to partial exits only — not entry contract count.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="w-28 font-mono text-[.62rem] text-text-muted">When missing:</span>
+            <select
+              value={state.exitQty.whenMissing}
+              onChange={(e) =>
+                onChange({
+                  ...state,
+                  exitQty: { ...state.exitQty, whenMissing: e.target.value as ExitQtyWhenMissing },
+                })
+              }
+              className={selectCls}
+            >
+              <option value="reject">Reject — partial exit must state how much to sell</option>
+              <option value="use_default">Sell my default % of the open position</option>
+            </select>
+          </div>
+          {state.exitQty.whenMissing === "use_default" && (
+            <div className="ml-[7.25rem] mt-2.5 flex items-center gap-2">
+              <label className="font-mono text-[.62rem] text-text-muted">Default sell %</label>
+              <input
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                value={state.exitQty.defaultExitPct}
+                onChange={(e) =>
+                  onChange({
+                    ...state,
+                    exitQty: { ...state.exitQty, defaultExitPct: e.target.value },
+                  })
+                }
+                placeholder="50"
+                className={inputCls}
+              />
+              <span className="font-mono text-[.62rem] text-text-muted">% of open position</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

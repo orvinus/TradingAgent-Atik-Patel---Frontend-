@@ -8,8 +8,10 @@ import type {
   SlFormState,
   TpFormState,
   LotFormState,
+  ExitQtyFormState,
   TpLevelRow,
   EntryWhenMissing,
+  ExitQtyWhenMissing,
 } from "./types";
 
 const selectCls =
@@ -339,6 +341,53 @@ function LotSection({ state, onChange }: { state: LotFormState; onChange: (s: Lo
   );
 }
 
+// ── Exit Qty Section ──────────────────────────────────────────────────────────
+
+function ExitQtySection({
+  state,
+  onChange,
+}: {
+  state: ExitQtyFormState;
+  onChange: (s: ExitQtyFormState) => void;
+}) {
+  const useDefault = state.whenMissing === "use_default";
+  return (
+    <div className="flex flex-col gap-3">
+      <SectionHeader
+        title="Sell quantity / exit %"
+        hint="For securing/trim messages without % or lot size (e.g. &ldquo;SECURING FCEL at 36.00&rdquo;). Applies to partial exits only — not entry lot size."
+      />
+      <div className="flex items-center gap-3">
+        <span className="w-28 font-mono text-[.62rem] text-text-muted">When missing:</span>
+        <select
+          value={state.whenMissing}
+          onChange={(e) => onChange({ ...state, whenMissing: e.target.value as ExitQtyWhenMissing })}
+          className={selectCls}
+        >
+          <option value="reject">Reject — partial exit must state how much to sell</option>
+          <option value="use_default">Sell my default % of the open position</option>
+        </select>
+      </div>
+      {useDefault && (
+        <div className="ml-[7.25rem] flex items-center gap-2">
+          <label className="font-mono text-[.62rem] text-text-muted">Default sell %</label>
+          <input
+            type="number"
+            min={1}
+            max={100}
+            step={1}
+            value={state.defaultExitPct}
+            onChange={(e) => onChange({ ...state, defaultExitPct: e.target.value })}
+            placeholder="50"
+            className={inputCls}
+          />
+          <span className="font-mono text-[.62rem] text-text-muted">% of open position</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Root form component ───────────────────────────────────────────────────────
 
 export default function MissingFieldsForm({
@@ -359,8 +408,11 @@ export default function MissingFieldsForm({
       <div className="py-6">
         <TpSection state={state.tp} onChange={(tp) => onChange({ ...state, tp })} />
       </div>
-      <div className="pt-6">
+      <div className="py-6">
         <LotSection state={state.lotSize} onChange={(lotSize) => onChange({ ...state, lotSize })} />
+      </div>
+      <div className="pt-6">
+        <ExitQtySection state={state.exitQty} onChange={(exitQty) => onChange({ ...state, exitQty })} />
       </div>
     </div>
   );
