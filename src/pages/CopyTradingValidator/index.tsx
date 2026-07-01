@@ -23,7 +23,7 @@ function apiErr(err: unknown): string {
 
 const PROFILE_DESCRIPTIONS: Record<ValidatorProfile, string> = {
   equity: "Rules for equity, ETF, and FX signals (shares / lot size).",
-  commodity: "Spot commodity signals — gold, silver, oil (lot size in lots). Separate from equity limits.",
+  commodity: "FX and metals signals — gold, silver, oil, forex (lot size in lots). Separate from equity limits.",
   crypto: "Crypto spot and perps (units). Separate from equity limits.",
   options: "Futures and options contracts. Uses contract size and optional premium cap.",
 };
@@ -147,7 +147,7 @@ export default function CopyTradingValidator() {
   const isError = activeQuery.isError;
   const loadError = activeQuery.error;
 
-  const saveLabel = { equity: "Equity", commodity: "Commodity", crypto: "Crypto", options: "Futures & Options" }[activeTab];
+  const saveLabel = { equity: "Equity", commodity: "FX & Metals", crypto: "Crypto", options: "Futures & Options" }[activeTab];
 
   return (
     <div className="flex flex-col gap-6 p-6">
