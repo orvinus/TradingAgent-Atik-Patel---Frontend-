@@ -403,7 +403,7 @@ export default function CopyTradingX() {
             Connect X (Twitter)
           </h1>
           <p className="mt-1 font-mono text-[.7rem] text-text-muted">
-            Paste your session cookies to connect. Tweets are checked every ~5 minutes.
+            Paste your session cookies to connect. Tweets are checked every ~1 minutes.
           </p>
         </div>
 
@@ -629,8 +629,8 @@ export default function CopyTradingX() {
 
       {/* Polling notice */}
       <div className="rounded-sm border border-border-subtle bg-bg-surface px-3 py-2 font-mono text-[.62rem] text-text-disabled">
-        🕐 New tweets checked every ~5 minutes · Only tweets posted after you add a source are copied
-      </div>
+        🕐 New tweets checked every ~ · Only tweets posted after you add a source are copied
+      </div>1 minutes
 
       {/* Add source form */}
       <div className="flex flex-col gap-4 rounded-lg border border-border-subtle bg-bg-surface p-5 shadow-card">
