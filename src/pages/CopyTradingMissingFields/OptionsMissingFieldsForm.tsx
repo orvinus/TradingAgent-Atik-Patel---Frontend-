@@ -3,7 +3,7 @@
 // SL/TP are premium-based; TP supports single % / fixed price / Multi-TP levels.
 
 import { LuPlus, LuTrash2 } from "react-icons/lu";
-import type { WhenMissing, EntryWhenMissing, ExitQtyWhenMissing } from "@/types/missingFields";
+import type { WhenMissing, EntryWhenMissing, ExitQtyWhenMissing, ExpiryWhenMissing, ExpiryToken } from "@/types/missingFields";
 import type { OptionsMissingFieldsApiConfig } from "@/types/missingFields";
 
 const selectCls =
@@ -53,6 +53,10 @@ export interface OptionsMissingFieldsFormState {
     whenMissing: ExitQtyWhenMissing;
     defaultExitPct: string;
   };
+  expiry: {
+    whenMissing: ExpiryWhenMissing;
+    defaultExpiryToken: ExpiryToken;
+  };
 }
 
 export const DEFAULT_OPTIONS_FORM_STATE: OptionsMissingFieldsFormState = {
@@ -68,6 +72,7 @@ export const DEFAULT_OPTIONS_FORM_STATE: OptionsMissingFieldsFormState = {
   },
   contractSize: { whenMissing: "use_default", defaultContracts: "1" },
   exitQty: { whenMissing: "use_default", defaultExitPct: "50" },
+  expiry: { whenMissing: "use_default", defaultExpiryToken: "nearest" },
 };
 
 // ── Deserialize API → form state ──────────────────────────────────────────────
@@ -111,6 +116,10 @@ export function deserializeOptionsConfig(
     exitQty: {
       whenMissing: mf?.exitQty?.whenMissing ?? "use_default",
       defaultExitPct: mf?.exitQty?.defaultExitPct != null ? String(mf.exitQty.defaultExitPct) : "50",
+    },
+    expiry: {
+      whenMissing: mf?.expiry?.whenMissing ?? "use_default",
+      defaultExpiryToken: mf?.expiry?.defaultExpiryToken ?? "nearest",
     },
   };
 }
@@ -176,7 +185,14 @@ export function serializeOptionsConfig(form: OptionsMissingFieldsFormState): Opt
     if (v !== undefined) exitQty.defaultExitPct = v;
   }
 
-  return { entry, sl, tp, contractSize, exitQty };
+  const expiry: NonNullable<OptionsMissingFieldsApiConfig["expiry"]> = {
+    whenMissing: form.expiry.whenMissing,
+  };
+  if (form.expiry.whenMissing === "use_default") {
+    expiry.defaultExpiryToken = form.expiry.defaultExpiryToken;
+  }
+
+  return { entry, sl, tp, contractSize, exitQty, expiry };
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -630,6 +646,56 @@ export default function OptionsMissingFieldsForm({
                 className={inputCls}
               />
               <span className="font-mono text-[.62rem] text-text-muted">% of open position</span>
+            </div>
+          )}
+        </div>
+
+        {/* ── Expiry date ───────────────────────────────────────────────────── */}
+        <div className="pt-6">
+          <div className="mb-3">
+            <h3 className="font-mono text-[.72rem] font-bold uppercase tracking-[.12em] text-text-primary">
+              Expiry date
+            </h3>
+            <p className="mt-0.5 font-mono text-[.6rem] text-text-muted">
+              When a signal has strike and call/put but no expiry date or phrase (e.g. &ldquo;ORCL
+              $185C @ 5.80&rdquo;), the backend resolves expiry from your default using the US
+              options calendar.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="w-28 font-mono text-[.62rem] text-text-muted">When missing:</span>
+            <select
+              value={state.expiry.whenMissing}
+              onChange={(e) =>
+                onChange({
+                  ...state,
+                  expiry: { ...state.expiry, whenMissing: e.target.value as ExpiryWhenMissing },
+                })
+              }
+              className={selectCls}
+            >
+              <option value="reject">Reject — signal must include expiry</option>
+              <option value="use_default">Use my default expiry rule</option>
+            </select>
+          </div>
+          {state.expiry.whenMissing === "use_default" && (
+            <div className="ml-[7.25rem] mt-2.5 flex items-center gap-2">
+              <label className="font-mono text-[.62rem] text-text-muted">Default expiry</label>
+              <select
+                value={state.expiry.defaultExpiryToken}
+                onChange={(e) =>
+                  onChange({
+                    ...state,
+                    expiry: { ...state.expiry, defaultExpiryToken: e.target.value as ExpiryToken },
+                  })
+                }
+                className={selectCls}
+              >
+                <option value="nearest">Nearest</option>
+                <option value="this_week">This Week</option>
+                <option value="next_week">Next Week</option>
+                <option value="end_of_month">End Of This Month</option>
+              </select>
             </div>
           )}
         </div>

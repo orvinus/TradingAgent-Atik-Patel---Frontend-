@@ -5,6 +5,10 @@ export type WhenMissing = "reject" | "use_default" | "allow_empty";
 
 export type ExitQtyWhenMissing = "reject" | "use_default";
 
+export type ExpiryWhenMissing = "reject" | "use_default";
+
+export type ExpiryToken = "nearest" | "this_week" | "next_week" | "end_of_month";
+
 export type EntryWhenMissing = "reject" | "use_market" | "use_default";
 
 export type Completeness = "complete" | "partial" | "entry_only" | "invalid";
@@ -37,6 +41,11 @@ export interface LotSizeFieldConfig {
 export interface ExitQtyFieldConfig {
   whenMissing: ExitQtyWhenMissing;
   defaultExitPct?: number;
+}
+
+export interface ExpiryFieldConfig {
+  whenMissing: ExpiryWhenMissing;
+  defaultExpiryToken?: ExpiryToken;
 }
 
 export interface EntryFieldConfig {
@@ -132,6 +141,7 @@ export interface OptionsMissingFieldsApiConfig {
   tp?: TpFieldConfig;
   contractSize?: ContractSizeFieldConfig;
   exitQty?: ExitQtyFieldConfig;
+  expiry?: ExpiryFieldConfig;
 }
 
 // ── Source override ───────────────────────────────────────────────────────────
