@@ -8,6 +8,8 @@ import type {
   TelegramDialog,
   TelegramSource,
   ParsedSignalRow,
+  SignalSummary,
+  SignalThread,
 } from "@/types/copyTrading";
 
 interface Envelope<T> {
@@ -71,5 +73,15 @@ export const copyTradingApi = {
   listSignals: async (params?: { limit?: number; sourceId?: string }): Promise<ParsedSignalRow[]> => {
     const { data } = await apiClient.get<Envelope<{ signals: ParsedSignalRow[] }>>(`${BASE}/signals`, { params });
     return data.data.signals;
+  },
+
+  getSignalSummary: async (id: string): Promise<SignalSummary> => {
+    const { data } = await apiClient.get<Envelope<SignalSummary>>(`${BASE}/signals/${encodeURIComponent(id)}/summary`);
+    return data.data;
+  },
+
+  getSignalThread: async (id: string): Promise<SignalThread> => {
+    const { data } = await apiClient.get<Envelope<SignalThread>>(`${BASE}/signals/${encodeURIComponent(id)}/thread`);
+    return data.data;
   },
 };

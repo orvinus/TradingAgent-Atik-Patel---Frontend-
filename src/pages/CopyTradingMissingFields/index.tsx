@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LuArrowLeft, LuLoader, LuLink } from "react-icons/lu";
 import axios from "axios";
 import { missingFieldsApi } from "@/api/endpoints/missingFields";
-import { copyValidatorApi } from "@/api/endpoints/copyValidator";
 import { qk } from "@/api/queryKeys";
 import { ROUTES } from "@/constants/routes";
 import { toast } from "@/components/ui/Toast";
@@ -75,22 +74,17 @@ export default function CopyTradingMissingFields() {
     }
   }, [fullConfigQuery.data]);
 
-  // ── Options config — stored inside validator profiles.options.missingFields ─
-  const optionsValidatorConfigQuery = useQuery({
-    queryKey: qk.copyValidatorConfigProfile("options"),
-    queryFn: () => copyValidatorApi.getConfig("options"),
+  // ── Options config ────────────────────────────────────────────────────────
+  const optionsConfigQuery = useQuery({
+    queryKey: qk.missingFieldsOptionsConfig(),
+    queryFn: missingFieldsApi.getOptionsConfig,
   });
   const [optionsForm, setOptionsForm] = useState<OptionsMissingFieldsFormState>(DEFAULT_OPTIONS_FORM_STATE);
   useEffect(() => {
-    if (optionsValidatorConfigQuery.data) {
-      const data = optionsValidatorConfigQuery.data as {
-        profiles?: { options?: { missingFields?: Record<string, unknown> } };
-        effectiveConfig?: { missingFields?: Record<string, unknown> };
-      };
-      const mf = data.effectiveConfig?.missingFields ?? data.profiles?.options?.missingFields ?? null;
-      setOptionsForm(deserializeOptionsConfig(mf as Record<string, unknown>));
+    if (optionsConfigQuery.data) {
+      setOptionsForm(deserializeOptionsConfig(optionsConfigQuery.data as Record<string, unknown>));
     }
-  }, [optionsValidatorConfigQuery.data]);
+  }, [optionsConfigQuery.data]);
 
   // ── Save handlers ─────────────────────────────────────────────────────────
   const equitySaveMut = useMutation({
@@ -121,11 +115,10 @@ export default function CopyTradingMissingFields() {
   });
 
   const optionsSaveMut = useMutation({
-    mutationFn: (body: { profiles: { options: { missingFields: Record<string, unknown> } } }) =>
-      copyValidatorApi.updateConfig(body as Parameters<typeof copyValidatorApi.updateConfig>[0]),
+    mutationFn: missingFieldsApi.updateOptionsConfig,
     onSuccess: () => {
       toast.success("Options missing-field defaults saved");
-      qc.invalidateQueries({ queryKey: qk.copyValidatorConfigProfile("options") });
+      qc.invalidateQueries({ queryKey: qk.missingFieldsOptionsConfig() });
     },
     onError: (e) => toast.error(apiErr(e)),
   });
@@ -146,8 +139,7 @@ export default function CopyTradingMissingFields() {
     } else {
       const errors = validateOptionsForm(optionsForm);
       if (errors.length) { toast.error(errors[0] ?? "Please fix the highlighted fields."); return; }
-      const serialized = serializeOptionsConfig(optionsForm);
-      optionsSaveMut.mutate({ profiles: { options: serialized as { missingFields: Record<string, unknown> } } });
+      optionsSaveMut.mutate(serializeOptionsConfig(optionsForm));
     }
   };
 
@@ -155,14 +147,14 @@ export default function CopyTradingMissingFields() {
     equity: configQuery.isLoading || optionsQuery.isLoading,
     commodity: fullConfigQuery.isLoading || optionsQuery.isLoading,
     crypto: fullConfigQuery.isLoading || optionsQuery.isLoading,
-    options: optionsValidatorConfigQuery.isLoading,
+    options: optionsConfigQuery.isLoading,
   }[activeTab];
 
   const isError = {
     equity: configQuery.isError,
     commodity: fullConfigQuery.isError,
     crypto: fullConfigQuery.isError,
-    options: optionsValidatorConfigQuery.isError,
+    options: optionsConfigQuery.isError,
   }[activeTab];
 
   const isSaving = {
@@ -248,8 +240,9 @@ export default function CopyTradingMissingFields() {
                       setOptionsForm({
                         entry: { whenMissing: "use_market", defaultPremium: "" },
                         sl: { whenMissing: "use_default", defaultPctFromEntry: "20" },
-                        tp: { whenMissing: "allow_empty", defaultPctFromEntry: "" },
+                        tp: { whenMissing: "allow_empty", priceMode: "pct", defaultPctFromEntry: "", fixed: "", multiTp: false, tpLevels: [{ pctFromEntry: "", exit_pct: "" }] },
                         contractSize: { whenMissing: "use_default", defaultContracts: "1" },
+                        exitQty: { whenMissing: "use_default", defaultExitPct: "50" },
                       })
                     }
                     className="rounded-sm border border-border-default px-2.5 py-1 font-mono text-[.6rem] text-text-secondary hover:border-purple-400 hover:text-purple-400"
@@ -261,8 +254,9 @@ export default function CopyTradingMissingFields() {
                       setOptionsForm({
                         entry: { whenMissing: "reject", defaultPremium: "" },
                         sl: { whenMissing: "reject", defaultPctFromEntry: "" },
-                        tp: { whenMissing: "reject", defaultPctFromEntry: "" },
+                        tp: { whenMissing: "reject", priceMode: "pct", defaultPctFromEntry: "", fixed: "", multiTp: false, tpLevels: [{ pctFromEntry: "", exit_pct: "" }] },
                         contractSize: { whenMissing: "reject", defaultContracts: "" },
+                        exitQty: { whenMissing: "reject", defaultExitPct: "" },
                       })
                     }
                     className="rounded-sm border border-border-default px-2.5 py-1 font-mono text-[.6rem] text-text-secondary hover:border-bear hover:text-bear"

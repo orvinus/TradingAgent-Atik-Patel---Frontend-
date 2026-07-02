@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { LuArrowLeft, LuLoader, LuMail, LuLock, LuRefreshCw, LuTriangle } from "react-icons/lu";
+import { LuArrowLeft, LuLoader, LuMail, LuLock, LuRefreshCw, LuTriangle, LuSearch } from "react-icons/lu";
 import { discordSelfCopierApi } from "@/api/endpoints/discordSelfCopyTrading";
 import type { DiscordSelfDialog, DiscordSelfSource } from "@/types/discordSelfCopyTrading";
 import { qk } from "@/api/queryKeys";
@@ -80,6 +80,7 @@ export default function CopyTradingDiscordAccount() {
   const [polling, setPolling] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmStop, setConfirmStop] = useState<string | null>(null);
+  const [dialogSearch, setDialogSearch] = useState("");
 
   const configQuery = useQuery({
     queryKey: qk.discordSelfConfig(),
@@ -420,6 +421,15 @@ export default function CopyTradingDiscordAccount() {
 
   if (step === "channels") {
     const dialogs = normalizeDialogs(dialogsQuery.data);
+    const dq = dialogSearch.toLowerCase();
+    const filteredDialogs = dq
+      ? dialogs.filter(
+          (d) =>
+            d.channelName.toLowerCase().includes(dq) ||
+            (d.guildName ?? "").toLowerCase().includes(dq),
+        )
+      : dialogs;
+
     return (
       <div className="flex flex-col gap-6 p-6">
         <Back onClick={() => setStep("connected")} />
@@ -447,9 +457,23 @@ export default function CopyTradingDiscordAccount() {
         )}
 
         {dialogsQuery.isSuccess && dialogs.length > 0 && (
+          <>
+            <div className="relative">
+              <LuSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                value={dialogSearch}
+                onChange={(e) => setDialogSearch(e.target.value)}
+                placeholder="Search channels…"
+                className="w-full rounded-sm border border-border-default bg-bg-elevated py-2 pl-8 pr-3 font-mono text-[.7rem] text-text-primary placeholder-text-disabled focus:border-accent focus:outline-none"
+              />
+            </div>
+            {filteredDialogs.length === 0 ? (
+              <p className="font-mono text-[.65rem] text-text-muted">No channels match your search.</p>
+            ) : (
           <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
-            {dialogs.map((dialog, i) => {
-              const isLast = i === dialogs.length - 1;
+            {filteredDialogs.map((dialog, i) => {
+              const isLast = i === filteredDialogs.length - 1;
               const isAdding =
                 addSource.isPending &&
                 addSource.variables?.channelId === dialog.channelId;
@@ -523,6 +547,8 @@ export default function CopyTradingDiscordAccount() {
               );
             })}
           </div>
+            )}
+          </>
         )}
       </div>
     );

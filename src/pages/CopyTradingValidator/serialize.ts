@@ -19,14 +19,12 @@ const defKind = new Map(FIELD_DEFS.map((d) => [d.key, d.kind] as const));
 function serializeSymbolFilter(c: NormalizedValidatorConfig): Pick<ProfileConfig, "symbolFilter"> {
   const inc = c.symbolFilter?.include?.trim() ?? "";
   const exc = c.symbolFilter?.exclude?.trim() ?? "";
-  if (!inc && !exc) return {};
   return { symbolFilter: { ...(inc ? { include: inc } : {}), ...(exc ? { exclude: exc } : {}) } };
 }
 
 function serializeMessageFilter(c: NormalizedValidatorConfig): Pick<ProfileConfig, "messageFilter"> {
   const inc = c.messageFilter?.include?.trim() ?? "";
   const exc = c.messageFilter?.exclude?.trim() ?? "";
-  if (!inc && !exc) return {};
   return { messageFilter: { ...(inc ? { include: inc } : {}), ...(exc ? { exclude: exc } : {}) } };
 }
 

@@ -10,7 +10,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: "equity",    label: "Equity",             dotColor: "bg-blue-400" },
-  { id: "commodity", label: "Commodity",           dotColor: "bg-amber-400" },
+  { id: "commodity", label: "FX & Metals",          dotColor: "bg-amber-400" },
   { id: "crypto",    label: "Crypto",              dotColor: "bg-orange-400" },
   { id: "options",   label: "Futures & Options",   dotColor: "bg-purple-400" },
 ];

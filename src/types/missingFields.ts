@@ -3,6 +3,8 @@
 
 export type WhenMissing = "reject" | "use_default" | "allow_empty";
 
+export type ExitQtyWhenMissing = "reject" | "use_default";
+
 export type EntryWhenMissing = "reject" | "use_market" | "use_default";
 
 export type Completeness = "complete" | "partial" | "entry_only" | "invalid";
@@ -32,6 +34,11 @@ export interface LotSizeFieldConfig {
   defaultLots?: number;
 }
 
+export interface ExitQtyFieldConfig {
+  whenMissing: ExitQtyWhenMissing;
+  defaultExitPct?: number;
+}
+
 export interface EntryFieldConfig {
   whenMissing: EntryWhenMissing;
   defaultLimitPrice?: number;
@@ -42,6 +49,7 @@ export interface MissingFieldsConfig {
   sl: SlFieldConfig;
   tp: TpFieldConfig;
   lotSize: LotSizeFieldConfig;
+  exitQty?: ExitQtyFieldConfig;
 }
 
 // Full config response including per-profile keys
@@ -109,6 +117,21 @@ export interface MissingFieldsPreviewResult {
 export interface MissingFieldsPreviewResponse {
   result: MissingFieldsPreviewResult;
   configUsed?: Record<string, unknown>;
+}
+
+// ── Options-specific config ───────────────────────────────────────────────────
+
+export interface ContractSizeFieldConfig {
+  whenMissing: WhenMissing;
+  defaultContracts?: number;
+}
+
+export interface OptionsMissingFieldsApiConfig {
+  entry?: EntryFieldConfig;
+  sl?: SlFieldConfig;
+  tp?: TpFieldConfig;
+  contractSize?: ContractSizeFieldConfig;
+  exitQty?: ExitQtyFieldConfig;
 }
 
 // ── Source override ───────────────────────────────────────────────────────────

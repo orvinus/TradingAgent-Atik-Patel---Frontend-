@@ -1,16 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { notificationsApi } from "@/api/endpoints/notifications";
+import type { NotificationKind, NotificationSource } from "@/types/notifications";
 import { useAppStore } from "@/store/index";
 import { qk } from "@/api/queryKeys";
 
 export const NOTIFICATIONS_PAGE_SIZE = 10;
 const PREVIEW_SIZE = 3;
 
-export function useNotificationInbox(offset: number, unreadOnly: boolean) {
+export function useNotificationInbox(
+  offset: number,
+  unreadOnly: boolean,
+  kind?: NotificationKind,
+  source?: NotificationSource,
+) {
   return useQuery({
-    queryKey: qk.notificationsInbox(offset, unreadOnly, NOTIFICATIONS_PAGE_SIZE),
+    queryKey: qk.notificationsInbox(offset, unreadOnly, NOTIFICATIONS_PAGE_SIZE, kind, source),
     queryFn: () =>
-      notificationsApi.getInbox({ limit: NOTIFICATIONS_PAGE_SIZE, offset, unreadOnly }),
+      notificationsApi.getInbox({
+        limit: NOTIFICATIONS_PAGE_SIZE,
+        offset,
+        unreadOnly,
+        ...(kind != null ? { kind } : {}),
+        ...(source != null ? { source } : {}),
+      }),
     placeholderData: (prev) => prev,
   });
 }

@@ -9,6 +9,7 @@ import {
   LuPhone,
   LuLock,
   LuRefreshCw,
+  LuSearch,
 } from "react-icons/lu";
 import { copyTradingApi } from "@/api/endpoints/copyTrading";
 import { qk } from "@/api/queryKeys";
@@ -89,6 +90,7 @@ export default function CopyTradingTelegram() {
   const [polling, setPolling] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const [confirmStop, setConfirmStop] = useState<string | null>(null);
+  const [dialogSearch, setDialogSearch] = useState("");
 
   const statusQuery = useQuery({
     queryKey: qk.copyTradingStatus(),
@@ -427,6 +429,15 @@ export default function CopyTradingTelegram() {
   // ── Channel picker ────────────────────────────────────────────────────────
 
   if (step === "channels") {
+    const q = dialogSearch.toLowerCase();
+    const filteredDialogs = q
+      ? dialogs.filter(
+          (d) =>
+            d.title.toLowerCase().includes(q) ||
+            (d.username ?? "").toLowerCase().includes(q),
+        )
+      : dialogs;
+
     return (
       <div className="flex flex-col gap-6 p-6">
         <Back onClick={() => setStep("connected")} />
@@ -456,70 +467,85 @@ export default function CopyTradingTelegram() {
         )}
 
         {dialogsQuery.isSuccess && dialogs.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
-            {dialogs.map((dialog, i) => {
-              const isLast = i === dialogs.length - 1;
-              const isAdding  = addSource.isPending && addSource.variables === dialog.chatId;
-              const isStopping = removeSource.isPending && removeSource.variables === dialog.chatId;
+          <>
+            <div className="relative">
+              <LuSearch className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                value={dialogSearch}
+                onChange={(e) => setDialogSearch(e.target.value)}
+                placeholder="Search channels…"
+                className="w-full rounded-sm border border-border-default bg-bg-elevated py-2 pl-8 pr-3 font-mono text-[.7rem] text-text-primary placeholder-text-disabled focus:border-accent focus:outline-none"
+              />
+            </div>
 
-              return (
-                <div
-                  key={dialog.chatId}
-                  className={`flex items-center justify-between px-4 py-3 ${
-                    !isLast ? "border-b border-border-subtle" : ""
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-mono text-[.72rem] text-text-primary">
-                      {dialog.type === "channel" ? "📢" : "👥"} {dialog.title}
-                    </p>
-                    <p className="mt-0.5 font-mono text-[.6rem] text-text-disabled">
-                      {dialog.type}
-                      {dialog.username ? ` · @${dialog.username}` : ""}
-                    </p>
-                  </div>
-
-                  <div className="ml-4 flex-shrink-0">
-                    {dialog.isMonitored ? (
-                      confirmStop === dialog.chatId ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-mono text-[.58rem] text-text-muted">Sure?</span>
+            {filteredDialogs.length === 0 ? (
+              <p className="font-mono text-[.65rem] text-text-muted">No channels match your search.</p>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-border-subtle bg-bg-surface shadow-card">
+                {filteredDialogs.map((dialog, i) => {
+                  const isLast = i === filteredDialogs.length - 1;
+                  const isAdding = addSource.isPending && addSource.variables === dialog.chatId;
+                  const isStopping = removeSource.isPending && removeSource.variables === dialog.chatId;
+                  return (
+                    <div
+                      key={dialog.chatId}
+                      className={`flex items-center justify-between px-4 py-3 ${
+                        !isLast ? "border-b border-border-subtle" : ""
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-mono text-[.72rem] text-text-primary">
+                          {dialog.type === "channel" ? "📢" : "👥"} {dialog.title}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[.6rem] text-text-disabled">
+                          {dialog.type}
+                          {dialog.username ? ` · @${dialog.username}` : ""}
+                        </p>
+                      </div>
+                      <div className="ml-4 flex-shrink-0">
+                        {dialog.isMonitored ? (
+                          confirmStop === dialog.chatId ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-[.58rem] text-text-muted">Sure?</span>
+                              <button
+                                onClick={() => removeSource.mutate(dialog.chatId)}
+                                disabled={isStopping}
+                                className="rounded-sm bg-bear px-2 py-1 font-mono text-[.58rem] text-white hover:opacity-80 disabled:opacity-50"
+                              >
+                                {isStopping ? <LuLoader className="h-2.5 w-2.5 animate-spin" /> : "Stop"}
+                              </button>
+                              <button
+                                onClick={() => setConfirmStop(null)}
+                                className="font-mono text-[.58rem] text-text-muted hover:text-text-secondary"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmStop(dialog.chatId)}
+                              className="rounded-sm border border-bear/50 px-2.5 py-1 font-mono text-[.62rem] text-bear transition-colors hover:bg-bear/10"
+                            >
+                              Stop
+                            </button>
+                          )
+                        ) : (
                           <button
-                            onClick={() => removeSource.mutate(dialog.chatId)}
-                            disabled={isStopping}
-                            className="rounded-sm bg-bear px-2 py-1 font-mono text-[.58rem] text-white hover:opacity-80 disabled:opacity-50"
+                            onClick={() => addSource.mutate(dialog.chatId)}
+                            disabled={isAdding}
+                            className="rounded-sm bg-accent px-2.5 py-1 font-mono text-[.62rem] font-bold text-bg-base transition-colors hover:bg-accent-hover disabled:opacity-50"
                           >
-                            {isStopping ? <LuLoader className="h-2.5 w-2.5 animate-spin" /> : "Stop"}
+                            {isAdding ? <LuLoader className="h-2.5 w-2.5 animate-spin" /> : "Copy"}
                           </button>
-                          <button
-                            onClick={() => setConfirmStop(null)}
-                            className="font-mono text-[.58rem] text-text-muted hover:text-text-secondary"
-                          >
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmStop(dialog.chatId)}
-                          className="rounded-sm border border-bear/50 px-2.5 py-1 font-mono text-[.62rem] text-bear transition-colors hover:bg-bear/10"
-                        >
-                          Stop
-                        </button>
-                      )
-                    ) : (
-                      <button
-                        onClick={() => addSource.mutate(dialog.chatId)}
-                        disabled={isAdding}
-                        className="rounded-sm bg-accent px-2.5 py-1 font-mono text-[.62rem] font-bold text-bg-base transition-colors hover:bg-accent-hover disabled:opacity-50"
-                      >
-                        {isAdding ? <LuLoader className="h-2.5 w-2.5 animate-spin" /> : "Copy"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
       </div>
     );

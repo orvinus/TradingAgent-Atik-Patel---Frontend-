@@ -190,6 +190,7 @@ export interface NormalizedValidatorConfig {
 export interface ValidatorConfigResponse {
   config: ValidatorConfig;
   profile?: ValidatorProfile;
+  savedProfileConfig?: ProfileConfig;
   effectiveConfig?: ProfileConfig;
   profiles?: {
     equity?: ProfileConfig;
@@ -359,6 +360,29 @@ export type CopyOrderStatus =
   | "failed"
   | "cancelled";
 
+export type OrderRole =
+  | "entry"
+  | "partial_exit"
+  | "full_exit"
+  | "adjust_sl"
+  | "update_tp"
+  | "cancel"
+  | "reenter";
+
+export interface ManagementAction {
+  messageType: string;
+  exitPct?: number | null;
+  sellQty?: number | null;
+  openQty?: number | null;
+  qtySource?: string | null;
+  threadKey?: string | null;
+  lifecycleSummary?: string | null;
+  adjustMode?: "breakeven" | "explicit_price" | null;
+  newSlPrice?: number | null;
+  previousSlPrice?: number | null;
+  bracketBrokerOrderId?: string | null;
+}
+
 export interface TpLevel {
   level: number;
   exit_pct: number;
@@ -443,6 +467,16 @@ export interface CopyOrder {
   submittedAt?: string | null;
   createdAt: string;
   updatedAt?: string;
+  // Phase 2: management order fields
+  orderRole?: OrderRole | null;
+  tradeThreadId?: string | null;
+  managementAction?: ManagementAction | null;
+  telegramSignalId?: string | null;
+  discordSignalId?: string | null;
+  // Phase 3: fill sync
+  filledQty?: number | null;
+  avgFillPrice?: number | null;
+  filledAt?: string | null;
 }
 
 // Editable subset for PATCH /orders/:id and confirm userEdits.

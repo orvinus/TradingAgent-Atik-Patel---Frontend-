@@ -11,7 +11,9 @@ import type {
   InboxItem,
   InboxListResponse,
   NotificationConnection,
+  NotificationKind,
   NotificationProvider,
+  NotificationSource,
   TelegramConnectLinkResponse,
   UnreadCountResponse,
 } from "@/types/notifications";
@@ -65,6 +67,8 @@ export const notificationsApi = {
     limit?: number;
     offset?: number;
     unreadOnly?: boolean;
+    kind?: NotificationKind;
+    source?: NotificationSource;
   }): Promise<{ items: InboxItem[]; hasMore: boolean }> => {
     const { data } = await apiClient.get<ApiEnvelope<InboxListResponse | InboxItem[]>>(
       "/notifications/inbox",
